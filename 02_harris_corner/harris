@@ -1,0 +1,38 @@
+import cv2 as cv
+import numpy as np
+
+# 讀取影像 (請確認路徑對不對，建議用跟 ORB 同一張圖)
+filename = 'test_image.png' 
+img = cv.imread(filename)
+
+if img is None:
+    print(f"錯誤：找不到 {filename}")
+    exit()
+
+# 1. Harris 只能吃灰階圖，且必須是 float32 格式
+gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+gray = np.float32(gray)
+
+# 2. 執行 Harris 角點檢測
+# 參數解釋：
+# blockSize=2: 鄰域大小
+# ksize=3: Sobel 算子的孔徑參數
+# k=0.04: Harris 檢測器的自由參數 (通常取 0.04 - 0.06)
+dst = cv.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)
+
+# 3. 結果處理 (為了讓角點更明顯，我們做一點膨脹處理)
+dst = cv.dilate(dst, None)
+
+# 4. 將檢測到的角點標記為紅色
+# dst > 0.01 * dst.max() 代表只取響應值最大的前 1% 強角點
+img[dst > 0.01 * dst.max()] = [0, 0, 255]
+
+# 5. 顯示與儲存結果
+cv.imshow('Harris Corners', img)
+cv.imwrite('result_harris.jpg', img)
+
+print("Harris 檢測完成！結果已儲存為 result_harris.jpg")
+print("請按任意鍵關閉視窗...")
+
+cv.waitKey(0)
+cv.destroyAllWindows()
