@@ -1,0 +1,291 @@
+{
+    "schema_version": "1.0.0",
+    "last_updated": "2026-01-13T14:23:00+08:00",
+    "description": "NKUST Vision Lab - OpenCV Algorithm Library with FPGA Constraints",
+    "libraries": {
+        "official": {
+            "gaussian_blur": {
+                "id": "cv_gaussian_blur_v1",
+                "name": "Gaussian Blur",
+                "category": "preprocessing",
+                "description": "平滑濾波器，用於降噪與模糊處理",
+                "opencv_function": "cv2.GaussianBlur",
+                "parameters": {
+                    "ksize": {
+                        "type": "tuple",
+                        "default": [
+                            5,
+                            5
+                        ],
+                        "range": [
+                            [
+                                3,
+                                3
+                            ],
+                            [
+                                31,
+                                31
+                            ]
+                        ],
+                        "constraint": "必須為奇數",
+                        "description": "Kernel 大小"
+                    },
+                    "sigmaX": {
+                        "type": "float",
+                        "default": 0,
+                        "range": [
+                            0,
+                            10
+                        ],
+                        "description": "X 方向標準差（0 表示自動計算）"
+                    },
+                    "sigmaY": {
+                        "type": "float",
+                        "default": 0,
+                        "range": [
+                            0,
+                            10
+                        ],
+                        "description": "Y 方向標準差（0 表示自動計算）"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 150,
+                    "resource_usage": "Medium",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 4,
+                    "lut_count": 2500,
+                    "bram_kb": 18,
+                    "notes": "Kernel 越大，資源消耗越高。建議 5x5 或 7x7。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2024-09-01"
+            },
+            "canny_edge": {
+                "id": "cv_canny_v1",
+                "name": "Canny Edge Detection",
+                "category": "edge_detection",
+                "description": "經典邊緣檢測演算法，包含梯度計算與非極大值抑制",
+                "opencv_function": "cv2.Canny",
+                "parameters": {
+                    "threshold1": {
+                        "type": "int",
+                        "default": 50,
+                        "range": [
+                            0,
+                            255
+                        ],
+                        "description": "第一閾值（低閾值）"
+                    },
+                    "threshold2": {
+                        "type": "int",
+                        "default": 150,
+                        "range": [
+                            0,
+                            255
+                        ],
+                        "description": "第二閾值（高閾值）"
+                    },
+                    "apertureSize": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            3,
+                            7
+                        ],
+                        "constraint": "必須為奇數",
+                        "description": "Sobel 算子的 Aperture 大小"
+                    },
+                    "L2gradient": {
+                        "type": "bool",
+                        "default": false,
+                        "description": "是否使用 L2 範數計算梯度"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 450,
+                    "resource_usage": "High",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 12,
+                    "lut_count": 8500,
+                    "bram_kb": 72,
+                    "notes": "包含 Sobel, NMS, Hysteresis 三大模組。建議預留充足資源。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2024-09-01"
+            },
+            "dilate": {
+                "id": "cv_dilate_v1",
+                "name": "Morphological Dilation",
+                "category": "morphology",
+                "description": "形態學膨脹運算，用於填充小孔洞與連接斷裂區域",
+                "opencv_function": "cv2.dilate",
+                "parameters": {
+                    "kernel": {
+                        "type": "ndarray",
+                        "default": "np.ones((3,3), np.uint8)",
+                        "description": "結構元素（Kernel）"
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 1,
+                        "range": [
+                            1,
+                            10
+                        ],
+                        "description": "迭代次數"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 80,
+                    "resource_usage": "Low",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 0,
+                    "lut_count": 1200,
+                    "bram_kb": 9,
+                    "notes": "單次 Dilate 非常輕量。但多次迭代會累積延遲。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2024-09-01"
+            },
+            "hough_circles": {
+                "id": "cv_hough_circles_v1",
+                "name": "Hough Circle Transform",
+                "category": "shape_detection",
+                "description": "霍夫圓形檢測，用於辨識圓形物體",
+                "opencv_function": "cv2.HoughCircles",
+                "parameters": {
+                    "method": {
+                        "type": "int",
+                        "default": "cv2.HOUGH_GRADIENT",
+                        "description": "檢測方法"
+                    },
+                    "dp": {
+                        "type": "float",
+                        "default": 1.2,
+                        "range": [
+                            1.0,
+                            3.0
+                        ],
+                        "description": "累加器解析度與圖像解析度的反比"
+                    },
+                    "minDist": {
+                        "type": "int",
+                        "default": 30,
+                        "range": [
+                            10,
+                            200
+                        ],
+                        "description": "檢測到的圓心之間的最小距離"
+                    },
+                    "param1": {
+                        "type": "int",
+                        "default": 50,
+                        "range": [
+                            10,
+                            200
+                        ],
+                        "description": "Canny 邊緣檢測的高閾值"
+                    },
+                    "param2": {
+                        "type": "int",
+                        "default": 30,
+                        "range": [
+                            10,
+                            100
+                        ],
+                        "description": "累加器閾值"
+                    },
+                    "minRadius": {
+                        "type": "int",
+                        "default": 0,
+                        "range": [
+                            0,
+                            500
+                        ],
+                        "description": "最小圓半徑"
+                    },
+                    "maxRadius": {
+                        "type": "int",
+                        "default": 0,
+                        "range": [
+                            0,
+                            500
+                        ],
+                        "description": "最大圓半徑（0 表示不限制）"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 8500,
+                    "resource_usage": "Very High",
+                    "latency_type": "Iterative",
+                    "dsp_count": 24,
+                    "lut_count": 45000,
+                    "bram_kb": 512,
+                    "notes": "極度耗時！建議在 FPGA 上使用硬體加速或考慮替代方案（如 FindContours）。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2024-09-01"
+            }
+        },
+        "contributed": {
+            "clahe_enhance": {
+                "id": "student_clahe_v1",
+                "name": "CLAHE (Contrast Limited Adaptive Histogram Equalization)",
+                "category": "preprocessing",
+                "description": "自適應直方圖均衡化，用於處理光線不均的影像（學長姐貢獻）",
+                "opencv_function": "cv2.createCLAHE",
+                "parameters": {
+                    "clipLimit": {
+                        "type": "float",
+                        "default": 2.0,
+                        "range": [
+                            1.0,
+                            10.0
+                        ],
+                        "description": "對比度限制閾值"
+                    },
+                    "tileGridSize": {
+                        "type": "tuple",
+                        "default": [
+                            8,
+                            8
+                        ],
+                        "range": [
+                            [
+                                4,
+                                4
+                            ],
+                            [
+                                16,
+                                16
+                            ]
+                        ],
+                        "description": "網格大小"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 320,
+                    "resource_usage": "Medium",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 2,
+                    "lut_count": 3500,
+                    "bram_kb": 36,
+                    "notes": "需要大量記憶體來存儲區域直方圖。"
+                },
+                "author": "Student_2025_CoinRecognition",
+                "date_added": "2025-01-09",
+                "contributor_note": "此演算法在硬幣辨識專案中解決反光問題時被發現非常有效。"
+            }
+        }
+    },
+    "_metadata": {
+        "total_algorithms": 5,
+        "official_count": 4,
+        "contributed_count": 1,
+        "maintainers": [
+            "NKUST_Vision_Lab"
+        ],
+        "license": "MIT"
+    }
+}
