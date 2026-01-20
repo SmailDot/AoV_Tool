@@ -52,6 +52,23 @@ class ImageProcessor:
             "clahe_enhance": self._op_clahe,
         }
     
+    def get_supported_operations(self) -> Dict[str, Dict]:
+        """
+        [AI-Friendly] 回傳所有支援的操作與其參數定義 (Schema)
+        
+        這讓 AI Agent (如 n8n) 可以動態查詢此 Processor 支援哪些功能
+        而不需硬編碼。
+        """
+        schema = {}
+        for op_name, func in self.operation_map.items():
+            # 簡單解析 docstring
+            doc = func.__doc__.strip() if func.__doc__ else "No description"
+            schema[op_name] = {
+                "description": doc,
+                "type": "computer_vision_operation"
+            }
+        return schema
+
     def execute_pipeline(
         self, 
         image_bgr: np.ndarray, 
@@ -209,10 +226,12 @@ class ImageProcessor:
         
         coin_count = 0
         if circles is not None:
-            circles = np.uint16(np.around(circles))
-            coin_count = len(circles[0])
+            # 轉換為 uint16 之前確保類型安全，但 numpy 處理通常是動態的
+            # Explicitly cast to prevent type confusion in some linters
+            circles_uint16 = np.uint16(np.around(circles))
+            coin_count = len(circles_uint16[0])
             
-            for i in circles[0, :]:
+            for i in circles_uint16[0, :]:
                 # 畫圓周（輪廓，不填充）
                 cv2.circle(output, (i[0], i[1]), i[2], (0, 255, 0), 2)
                 # 畫圓心

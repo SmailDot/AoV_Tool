@@ -7,13 +7,71 @@ import streamlit.components.v1 as components
 import cv2
 import numpy as np
 import json
-from pyvis.network import Network
+# Handle pyvis import safely
+try:
+    from pyvis.network import Network
+except ImportError:
+    st.error("Missing dependency: pyvis. Please install it using `pip install pyvis`.")
+    Network = None
 
 from logic_engine import LogicEngine
 from processor import ImageProcessor
 from library_manager import LibraryManager
 from project_manager import ProjectManager
 from import_parser import ImportParser
+from code_generator import CodeGenerator
+
+# ==================== UI Components ====================
+
+def render_parameter_editor(node: dict, idx: int, node_id: str):
+    """
+    渲染參數編輯器 (UI Component)
+    """
+    params = node.get('parameters', {})
+    if not params:
+        return
+
+    st.markdown("**操作參數**")
+    for param_name, param_info in params.items():
+        param_default = param_info.get('default')
+        param_desc = param_info.get('description', param_name)
+        
+        col_p1, col_p2 = st.columns([1, 2])
+        with col_p1:
+            st.caption(param_name)
+        
+        with col_p2:
+            key = f"param_{node_id}_{param_name}"
+            
+            # Boolean
+            if isinstance(param_default, bool):
+                new_value = st.checkbox(param_desc, value=param_default, key=key, label_visibility="collapsed")
+            
+            # Integer
+            elif isinstance(param_default, int):
+                new_value = st.number_input(param_desc, value=param_default, step=1, key=key, label_visibility="collapsed")
+            
+            # Float
+            elif isinstance(param_default, float):
+                new_value = st.number_input(param_desc, value=param_default, step=0.1, format="%.2f", key=key, label_visibility="collapsed")
+            
+            # List (as string)
+            elif isinstance(param_default, list):
+                new_value_str = st.text_input(param_desc, value=str(param_default), key=key, label_visibility="collapsed")
+                try:
+                    new_value = json.loads(new_value_str)
+                except:
+                    new_value = param_default
+            
+            # String/Other
+            else:
+                new_value = st.text_input(param_desc, value=str(param_default), key=key, label_visibility="collapsed")
+            
+            # Update State
+            if new_value != param_default:
+                st.session_state.pipeline[idx]['parameters'][param_name]['default'] = new_value
+
+# ==================== Main App ====================
 
 st.set_page_config(
     page_title="NKUST AoV Tool",
@@ -38,6 +96,12 @@ if 'uploaded_image' not in st.session_state:
     st.session_state.uploaded_image = None
 if 'processed_image' not in st.session_state:
     st.session_state.processed_image = None
+if 'llm_api_key' not in st.session_state:
+    st.session_state.llm_api_key = ""
+if 'llm_base_url' not in st.session_state:
+    st.session_state.llm_base_url = "https://api.openai.com/v1"
+if 'use_mock_llm' not in st.session_state:
+    st.session_state.use_mock_llm = True
 
 st.title("NKUST AoV 演算法視覺化工具")
 
@@ -58,7 +122,9 @@ with col_left:
         st.session_state.uploaded_image = img_bgr
         
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        st.image(img_rgb, caption="原始影像", use_container_width=True)
+        # width=None caused StreamlitInvalidWidthError in newer versions
+        # Changing to None default behavior (letting streamlit handle it) or explicit value
+        st.image(img_rgb, caption="原始影像")
     
     st.divider()
     
@@ -73,8 +139,17 @@ with col_left:
     with col_gen1:
         if st.button("產生 Pipeline", type="primary", use_container_width=True):
             if user_query:
+                # Update API Key if provided
+                if st.session_state.llm_api_key:
+                    engine.prompt_master.api_key = st.session_state.llm_api_key
+                    engine.prompt_master.base_url = st.session_state.llm_base_url
+                    engine.prompt_master.llm_available = True
+                
                 with st.spinner("處理中..."):
-                    pipeline = engine.process_user_query(user_query, use_mock_llm=True)
+                    pipeline = engine.process_user_query(
+                        user_query, 
+                        use_mock_llm=st.session_state.use_mock_llm
+                    )
                     st.session_state.pipeline = pipeline
                     st.success(f"已產生 {len(pipeline)} 個節點")
                     st.rerun()
@@ -93,7 +168,6 @@ with col_left:
         st.subheader("3. Pipeline 編輯")
         
         # ========== 新增節點功能 ==========
-        # 提供從演算法庫中選擇並插入新節點的功能
         with st.expander("新增節點", expanded=False):
             all_algos = engine.lib_manager.list_algorithms()
             
@@ -203,77 +277,7 @@ with col_left:
                 st.caption(f"資源: {fpga.get('resource_usage', 'Unknown')}")
                 st.caption(f"延遲: {fpga.get('latency_type', 'Unknown')}")
                 
-                params = node.get('parameters', {})
-                if params:
-                    st.markdown("**操作參數**")
-                    
-                    for param_name, param_info in params.items():
-                        param_default = param_info.get('default')
-                        param_desc = param_info.get('description', param_name)
-                        
-                        col_p1, col_p2 = st.columns([1, 2])
-                        
-                        with col_p1:
-                            st.caption(param_name)
-                        
-                        with col_p2:
-                            if isinstance(param_default, bool):
-                                new_value = st.checkbox(
-                                    param_desc,
-                                    value=param_default,
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            elif isinstance(param_default, int):
-                                new_value = st.number_input(
-                                    param_desc,
-                                    value=param_default,
-                                    step=1,
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            elif isinstance(param_default, float):
-                                new_value = st.number_input(
-                                    param_desc,
-                                    value=param_default,
-                                    step=0.1,
-                                    format="%.2f",
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            elif isinstance(param_default, list):
-                                new_value_str = st.text_input(
-                                    param_desc,
-                                    value=str(param_default),
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                                try:
-                                    new_value = json.loads(new_value_str)
-                                except:
-                                    new_value = param_default
-                            
-                            elif isinstance(param_default, str):
-                                new_value = st.text_input(
-                                    param_desc,
-                                    value=param_default,
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            else:
-                                new_value = st.text_input(
-                                    param_desc,
-                                    value=str(param_default),
-                                    key=f"param_{node_id}_{param_name}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            if new_value != param_default:
-                                st.session_state.pipeline[idx]['parameters'][param_name]['default'] = new_value
+                render_parameter_editor(node, idx, node_id)
                 
                 if '_warning' in node:
                     st.warning(node['_warning'])
@@ -282,12 +286,12 @@ with col_left:
     
     st.subheader("4. 專案管理")
     
-    with st.expander("匯出專案 (保存您的完美參數)", expanded=False):
+    with st.expander("匯出專案 (保存參數)", expanded=False):
         st.caption("確保所有調整過的參數都會被保存")
         
         export_author = st.text_input("作者", placeholder="學號/姓名", key="export_author")
         export_notes = st.text_area("備註", placeholder="說明此Pipeline的用途", height=80, key="export_notes")
-        export_project_name = st.text_input("專案名稱", placeholder="例如：完美硬幣偵測", key="export_project_name")
+        export_project_name = st.text_input("專案名稱", placeholder="例如：硬幣偵測_V1", key="export_project_name")
         
         if st.session_state.pipeline:
             json_str = ProjectManager.export_project_to_json(
@@ -303,7 +307,7 @@ with col_left:
             
             with col_dl1:
                 st.download_button(
-                    label="下載專案檔",
+                    label="下載專案檔 (.json)",
                     data=json_str,
                     file_name=filename,
                     mime="application/json",
@@ -325,19 +329,45 @@ with col_left:
             
             st.caption(f"檔案名稱: {filename} | 大小: {len(json_str)} bytes")
             
-            with st.expander("參數驗證 (確認保存正確)", expanded=False):
+            with st.expander("參數驗證 & 即時預覽 (JSON)", expanded=False):
+                st.caption("此處顯示即將匯出的 Pipeline 資料，請確認 'default' 值是否正確更新。")
+                
+                # Show simplified view for validation
+                val_view = []
                 for idx, node in enumerate(st.session_state.pipeline):
-                    st.write(f"**[{idx}] {node['name']}**")
+                    node_summary = {
+                        "name": node['name'],
+                        "parameters": {}
+                    }
                     if node.get('parameters'):
                         for pname, pinfo in node['parameters'].items():
-                            st.caption(f"  {pname} = {pinfo.get('default')}")
-                    else:
-                        st.caption("  無參數")
+                            node_summary["parameters"][pname] = pinfo.get('default')
+                    val_view.append(node_summary)
+                
+                st.json(val_view)
             
-            with st.expander("查看完整JSON", expanded=False):
+            with st.expander("查看完整原始 JSON", expanded=False):
                 st.code(json_str, language="json", line_numbers=True)
-                st.info("可直接複製上方內容")
+                st.info("這是實際存檔的內容")
             
+            st.markdown("### 程式碼生成 (Code Generation)")
+            tab_py, tab_vhdl, tab_verilog = st.tabs(["Python (OpenCV)", "Vivado-VHDL (FPGA)", "Vivado-Verilog (FPGA)"])
+            
+            with tab_py:
+                py_code = CodeGenerator.generate_python_script(st.session_state.pipeline)
+                st.code(py_code, language="python")
+                st.download_button("下載 Python 腳本", py_code, "pipeline.py", "text/x-python")
+                
+            with tab_vhdl:
+                vhdl_code = CodeGenerator.generate_vhdl(st.session_state.pipeline)
+                st.code(vhdl_code, language="vhdl")
+                st.download_button("下載 Vivado-VHDL", vhdl_code, "pipeline.vhd", "text/plain")
+
+            with tab_verilog:
+                verilog_code = CodeGenerator.generate_verilog(st.session_state.pipeline)
+                st.code(verilog_code, language="verilog")
+                st.download_button("下載 Vivado-Verilog", verilog_code, "pipeline.v", "text/plain")
+
             total_clk = sum(n['fpga_constraints'].get('estimated_clk', 0) for n in st.session_state.pipeline)
             st.success(f"總時脈: {total_clk} clk | 節點數: {len(st.session_state.pipeline)}")
         else:
@@ -432,79 +462,82 @@ with col_right:
     st.subheader("流程圖")
     
     if st.session_state.pipeline:
-        # Create pyvis network
-        net = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black")
-        
-        # Configure physics
-        net.set_options("""
-        {
-          "physics": {
-            "enabled": true,
-            "stabilization": {"enabled": true, "iterations": 100},
-            "barnesHut": {"gravitationalConstant": -8000, "centralGravity": 0.3, "springLength": 200}
-          },
-          "interaction": {"dragNodes": true, "dragView": true, "zoomView": true}
-        }
-        """)
-        
-        # Add nodes
-        for idx, node in enumerate(st.session_state.pipeline):
-            node_id = node.get('id', f'node_{idx}')
-            node_name = node.get('name', '未知')
-            fpga = node.get('fpga_constraints', {})
-            clk = fpga.get('estimated_clk', 0)
-            latency_type = fpga.get('latency_type', 'Unknown')
-            resource = fpga.get('resource_usage', 'Unknown')
-            params = node.get('parameters', {})
+        if Network:
+            # Create pyvis network
+            net = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black")
             
-            param_strs = []
-            for i, (k, v) in enumerate(params.items()):
-                if i >= 2:
-                    break
-                default_val = v.get('default', '?')
-                if isinstance(default_val, list):
-                    default_val = str(default_val)
-                param_strs.append(f"{k}:{default_val}")
-            
-            param_line = ", ".join(param_strs) if param_strs else "無參數"
-            
-            label = f"{node_name}\n{param_line}\n{latency_type}\n{clk} clk"
-            title = f"<b>{node_name}</b><br>CLK: {clk}<br>資源: {resource}<br>延遲: {latency_type}"
-            
-            color_map = {
-                'Low': '#C8E6C9',
-                'Medium': '#FFF9C4',
-                'High': '#FFCCBC',
-                'Very High': '#FFCDD2'
+            # Configure physics
+            net.set_options("""
+            {
+              "physics": {
+                "enabled": true,
+                "stabilization": {"enabled": true, "iterations": 100},
+                "barnesHut": {"gravitationalConstant": -8000, "centralGravity": 0.3, "springLength": 200}
+              },
+              "interaction": {"dragNodes": true, "dragView": true, "zoomView": true}
             }
-            color = color_map.get(resource, '#E0E0E0')
+            """)
             
-            net.add_node(node_id, label=label, title=title, color=color, shape='box',
-                        font={'size': 14, 'face': 'Microsoft JhengHei'}, borderWidth=2)
-        
-        # Add edges
-        for i in range(len(st.session_state.pipeline) - 1):
-            current_node = st.session_state.pipeline[i]
-            next_node = st.session_state.pipeline[i + 1]
+            # Add nodes
+            for idx, node in enumerate(st.session_state.pipeline):
+                node_id = node.get('id', f'node_{idx}')
+                node_name = node.get('name', '未知')
+                fpga = node.get('fpga_constraints', {})
+                clk = fpga.get('estimated_clk', 0)
+                latency_type = fpga.get('latency_type', 'Unknown')
+                resource = fpga.get('resource_usage', 'Unknown')
+                params = node.get('parameters', {})
+                
+                param_strs = []
+                for i, (k, v) in enumerate(params.items()):
+                    if i >= 2:
+                        break
+                    default_val = v.get('default', '?')
+                    if isinstance(default_val, list):
+                        default_val = str(default_val)
+                    param_strs.append(f"{k}:{default_val}")
+                
+                param_line = ", ".join(param_strs) if param_strs else "無參數"
+                
+                label = f"{node_name}\n{param_line}\n{latency_type}\n{clk} clk"
+                title = f"<b>{node_name}</b><br>CLK: {clk}<br>資源: {resource}<br>延遲: {latency_type}"
+                
+                color_map = {
+                    'Low': '#C8E6C9',
+                    'Medium': '#FFF9C4',
+                    'High': '#FFCCBC',
+                    'Very High': '#FFCDD2'
+                }
+                color = color_map.get(resource, '#E0E0E0')
+                
+                net.add_node(node_id, label=label, title=title, color=color, shape='box',
+                            font={'size': 14, 'face': 'Microsoft JhengHei'}, borderWidth=2)
             
-            current_id = current_node.get('id', f'node_{i}')
-            next_id = next_node.get('id', f'node_{i+1}')
+            # Add edges
+            for i in range(len(st.session_state.pipeline) - 1):
+                current_node = st.session_state.pipeline[i]
+                next_node = st.session_state.pipeline[i + 1]
+                
+                current_id = current_node.get('id', f'node_{i}')
+                next_id = next_node.get('id', f'node_{i+1}')
+                
+                clk_label = f"{current_node['fpga_constraints'].get('estimated_clk', 0)} clk"            
+                net.add_edge(current_id, next_id, label=clk_label, color='#1976D2', arrows='to',
+                            font={'size': 12, 'face': 'Microsoft JhengHei'})
             
-            clk_label = f"{current_node['fpga_constraints'].get('estimated_clk', 0)} clk"            
-            net.add_edge(current_id, next_id, label=clk_label, color='#1976D2', arrows='to',
-                        font={'size': 12, 'face': 'Microsoft JhengHei'})
-        
-        # Generate and display
-        html_file = "pipeline_graph.html"
-        net.save_graph(html_file)
-        
-        with open(html_file, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        
-        components.html(html_content, height=620, scrolling=False)
-        
-        total_clk = sum(n['fpga_constraints'].get('estimated_clk', 0) for n in st.session_state.pipeline)
-        st.metric("總時脈", f"{total_clk} clk")
+            # Generate and display
+            html_file = "pipeline_graph.html"
+            net.save_graph(html_file)
+            
+            with open(html_file, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            components.html(html_content, height=620, scrolling=False)
+            
+            total_clk = sum(n['fpga_constraints'].get('estimated_clk', 0) for n in st.session_state.pipeline)
+            st.metric("總時脈", f"{total_clk} clk")
+        else:
+            st.warning("無法載入流程圖模組 (pyvis)")
         
     else:
         st.info("請先產生 Pipeline")
@@ -531,7 +564,7 @@ with col_right:
             new_h = int(h * zoom_level / 100)
             result_rgb = cv2.resize(result_rgb, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         
-        st.image(result_rgb, caption=f"({zoom_level}%)", use_container_width=True)
+        st.image(result_rgb, caption=f"({zoom_level}%)")
         
         is_success, buffer = cv2.imencode(".png", st.session_state.processed_image)
         if is_success:
@@ -553,4 +586,47 @@ with st.sidebar:
     st.caption(f"貢獻: {len(engine.lib_manager.data['libraries']['contributed'])} 個")
     
     st.divider()
+    
+    st.header("LLM 設定")
+    st.caption("設定 LLM API 以獲得更靈活的建議")
+    
+    use_mock = st.toggle("使用 Mock 模式 (測試用)", value=st.session_state.use_mock_llm)
+    st.session_state.use_mock_llm = use_mock
+    
+    if not use_mock:
+        api_key = st.text_input("API Key (OpenAI format)", type="password", value=st.session_state.llm_api_key)
+        
+        base_url_help = """
+        **Base URL 設定指南：**
+        - **OpenAI (官方)**: `https://api.openai.com/v1` (預設)
+        - **Groq**: `https://api.groq.com/openai/v1`
+        - **DeepSeek**: `https://api.deepseek.com`
+        - **Local (LM Studio)**: `http://localhost:1234/v1`
+        - **Google Gemini**: `https://generativelanguage.googleapis.com/v1beta/openai/`
+        """
+        
+        base_url = st.text_input(
+            "Base URL (Optional)", 
+            value=st.session_state.llm_base_url, 
+            placeholder="https://api.openai.com/v1",
+            help=base_url_help
+        )
+        
+        if api_key:
+            st.session_state.llm_api_key = api_key
+            st.session_state.llm_base_url = base_url
+            st.caption("✅ API Key 已設定")
+        else:
+            st.warning("請輸入 API Key")
+    
+    st.divider()
     st.caption("NKUST Vision Lab")
+
+# Add a footer to catch direct execution
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 0 and "streamlit" not in sys.argv[0]:
+        print("\n[INFO] 建議使用以下指令啟動：")
+        print("python run_tool.py")
+        print("\n或者直接執行：")
+        print("python -m streamlit run aov_app.py\n")

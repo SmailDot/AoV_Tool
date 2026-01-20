@@ -57,16 +57,18 @@ class PromptMaster:
 **Example Output:** ["GaussianBlur", "Canny", "HoughCircles"]
 """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1"):
         """
         初始化 Prompt Master
         
         Args:
             api_key: OpenAI API Key（若為 None，從環境變數讀取）
             model: 使用的模型（預設 gpt-4）
+            base_url: API Base URL (預設 OpenAI 官方)
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
+        self.base_url = base_url
         
         if not self.api_key:
             print("[Warning] No OpenAI API Key found. LLM features will be disabled.")
@@ -89,10 +91,10 @@ class PromptMaster:
             return self._get_mock_suggestion(user_query)
         
         try:
-            import openai
-            openai.api_key = self.api_key
+            from openai import OpenAI
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.SYSTEM_PROMPT},

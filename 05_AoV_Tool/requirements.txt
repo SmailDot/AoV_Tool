@@ -13,6 +13,7 @@ pillow>=12.1.0
 
 # Visualization
 graphviz>=0.21
+pyvis>=0.3.2
 
 # Optional: LLM Integration (if using real API)
 # openai>=1.0.0
