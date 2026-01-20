@@ -20,6 +20,7 @@ from library_manager import LibraryManager
 from project_manager import ProjectManager
 from import_parser import ImportParser
 from code_generator import CodeGenerator
+from templates import get_default_templates
 
 # ==================== UI Components ====================
 
@@ -162,6 +163,48 @@ with col_left:
             st.session_state.processed_image = None
             st.rerun()
     
+    st.divider()
+
+    # ========== 快速模板 (Templates) ==========
+    st.subheader("2.5 快速模板")
+    templates = get_default_templates()
+    selected_template = st.selectbox("選擇預設場景", list(templates.keys()))
+    
+    if st.button("📥 載入模板", use_container_width=True):
+        raw_nodes = templates[selected_template]
+        hydrated_pipeline = []
+        
+        # Hydrate nodes with library data
+        for idx, raw_node in enumerate(raw_nodes):
+            func_name = raw_node['function']
+            # Try to find in library to get constraints and full info
+            # We search both official and contributed
+            algo_data = engine.lib_manager.get_algorithm(func_name, 'official')
+            if not algo_data:
+                algo_data = engine.lib_manager.get_algorithm(func_name, 'contributed')
+            
+            node_to_add = raw_node.copy()
+            if algo_data:
+                # Merge constraints and description
+                node_to_add['category'] = algo_data.get('category', 'unknown')
+                node_to_add['description'] = algo_data.get('description', '')
+                node_to_add['fpga_constraints'] = algo_data.get('fpga_constraints', {})
+                # Keep template parameters as overrides, but ensure structure exists
+                # If template has params, use them. If not, use default.
+                # Here we trust the template definition.
+            else:
+                # Fallback constraints
+                node_to_add['fpga_constraints'] = {"estimated_clk": 0, "resource_usage": "Unknown", "latency_type": "Software"}
+                
+            node_to_add['id'] = f"node_{idx}"
+            node_to_add['_enabled'] = True
+            hydrated_pipeline.append(node_to_add)
+            
+        st.session_state.pipeline = hydrated_pipeline
+        st.session_state.processed_image = None
+        st.success(f"已載入: {selected_template}")
+        st.rerun()
+
     st.divider()
     
     if st.session_state.pipeline:

@@ -349,6 +349,778 @@
                 "author": "NKUST_Vision_Lab",
                 "date_added": "2026-01-16",
                 "name_zh": "光流估計"
+            },
+            "median_blur": {
+                "id": "cv_median_blur_v1",
+                "name": "Median Blur",
+                "category": "filtering",
+                "description": "中值濾波，去除椒鹽雜訊特別有效",
+                "opencv_function": "cv2.medianBlur",
+                "parameters": {
+                    "ksize": {
+                        "type": "int",
+                        "default": 5,
+                        "range": [
+                            3,
+                            11
+                        ],
+                        "constraint": "odd",
+                        "description": "Kernel size (must be odd)"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 200,
+                    "resource_usage": "Medium",
+                    "dsp_count": 0,
+                    "lut_count": 3000,
+                    "bram_kb": 18
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Median Blur"
+            },
+            "bilateral_filter": {
+                "id": "cv_bilateral_v1",
+                "name": "Bilateral Filter",
+                "category": "filtering",
+                "description": "雙邊濾波，保持邊緣清晰的同時降噪",
+                "opencv_function": "cv2.bilateralFilter",
+                "parameters": {
+                    "d": {
+                        "type": "int",
+                        "default": 9,
+                        "range": [
+                            5,
+                            15
+                        ],
+                        "description": "Diameter of pixel neighborhood"
+                    },
+                    "sigmaColor": {
+                        "type": "float",
+                        "default": 75.0,
+                        "range": [
+                            10,
+                            150
+                        ],
+                        "description": "Filter sigma in the color space"
+                    },
+                    "sigmaSpace": {
+                        "type": "float",
+                        "default": 75.0,
+                        "range": [
+                            10,
+                            150
+                        ],
+                        "description": "Filter sigma in the coordinate space"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 800,
+                    "resource_usage": "High",
+                    "dsp_count": 8,
+                    "lut_count": 6000,
+                    "bram_kb": 36
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Bilateral Filter"
+            },
+            "box_filter": {
+                "id": "cv_box_filter_v1",
+                "name": "Box Filter",
+                "category": "filtering",
+                "description": "方框濾波 (Normalized Box Filter)",
+                "opencv_function": "cv2.boxFilter",
+                "parameters": {
+                    "ksize": {
+                        "type": "tuple",
+                        "default": [
+                            3,
+                            3
+                        ],
+                        "description": "Kernel size"
+                    },
+                    "normalize": {
+                        "type": "bool",
+                        "default": true,
+                        "description": "Normalize kernel by area"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 100,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 1500,
+                    "bram_kb": 9
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Box Filter"
+            },
+            "erode": {
+                "id": "cv_erode_v1",
+                "name": "Erode",
+                "category": "morphology",
+                "description": "侵蝕運算",
+                "opencv_function": "cv2.erode",
+                "parameters": {
+                    "kernel_size": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            3,
+                            7
+                        ],
+                        "description": "Kernel size (NxN)"
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 1,
+                        "range": [
+                            1,
+                            5
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 80,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 1200
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Erode"
+            },
+            "morph_open": {
+                "id": "cv_morph_open_v1",
+                "name": "Morphological Open",
+                "category": "morphology",
+                "description": "開運算 (先侵蝕後膨脹)，去除小白點",
+                "opencv_function": "cv2.morphologyEx",
+                "parameters": {
+                    "kernel_size": {
+                        "type": "int",
+                        "default": 5,
+                        "range": [
+                            3,
+                            11
+                        ]
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 1
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 160,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 2400
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Morphological Open"
+            },
+            "morph_close": {
+                "id": "cv_morph_close_v1",
+                "name": "Morphological Close",
+                "category": "morphology",
+                "description": "閉運算 (先膨脹後侵蝕)，填補小黑洞",
+                "opencv_function": "cv2.morphologyEx",
+                "parameters": {
+                    "kernel_size": {
+                        "type": "int",
+                        "default": 5,
+                        "range": [
+                            3,
+                            11
+                        ]
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 1
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 160,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 2400
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Morphological Close"
+            },
+            "morph_gradient": {
+                "id": "cv_morph_gradient_v1",
+                "name": "Morphological Gradient",
+                "category": "morphology",
+                "description": "形態學梯度 (膨脹 - 侵蝕)，提取輪廓",
+                "opencv_function": "cv2.morphologyEx",
+                "parameters": {
+                    "kernel_size": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            3,
+                            7
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 160,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 2400
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Morphological Gradient"
+            },
+            "sobel": {
+                "id": "cv_sobel_v1",
+                "name": "Sobel Operator",
+                "category": "edge_detection",
+                "description": "Sobel 邊緣檢測",
+                "opencv_function": "cv2.Sobel",
+                "parameters": {
+                    "dx": {
+                        "type": "int",
+                        "default": 1,
+                        "range": [
+                            0,
+                            2
+                        ],
+                        "description": "Order of derivative x"
+                    },
+                    "dy": {
+                        "type": "int",
+                        "default": 0,
+                        "range": [
+                            0,
+                            2
+                        ],
+                        "description": "Order of derivative y"
+                    },
+                    "ksize": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            7
+                        ],
+                        "constraint": "odd",
+                        "description": "Kernel size"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 120,
+                    "resource_usage": "Medium",
+                    "dsp_count": 2,
+                    "lut_count": 2000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Sobel Operator"
+            },
+            "laplacian": {
+                "id": "cv_laplacian_v1",
+                "name": "Laplacian",
+                "category": "edge_detection",
+                "description": "拉普拉斯算子，檢測二階導數",
+                "opencv_function": "cv2.Laplacian",
+                "parameters": {
+                    "ksize": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            7
+                        ],
+                        "constraint": "odd"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 120,
+                    "resource_usage": "Medium",
+                    "dsp_count": 2,
+                    "lut_count": 2000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Laplacian"
+            },
+            "resize": {
+                "id": "cv_resize_v1",
+                "name": "Resize",
+                "category": "geometric",
+                "description": "調整影像大小",
+                "opencv_function": "cv2.resize",
+                "parameters": {
+                    "width": {
+                        "type": "int",
+                        "default": 640,
+                        "range": [
+                            1,
+                            1920
+                        ]
+                    },
+                    "height": {
+                        "type": "int",
+                        "default": 480,
+                        "range": [
+                            1,
+                            1080
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 300,
+                    "resource_usage": "Medium",
+                    "dsp_count": 4,
+                    "lut_count": 2500,
+                    "notes": "Requires Line Buffers"
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Resize"
+            },
+            "flip": {
+                "id": "cv_flip_v1",
+                "name": "Flip",
+                "category": "geometric",
+                "description": "影像翻轉",
+                "opencv_function": "cv2.flip",
+                "parameters": {
+                    "flipCode": {
+                        "type": "int",
+                        "default": 1,
+                        "range": [
+                            -1,
+                            1
+                        ],
+                        "description": "1=Horizontal, 0=Vertical, -1=Both"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 50,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 500
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Flip"
+            },
+            "rotate": {
+                "id": "cv_rotate_v1",
+                "name": "Rotate",
+                "category": "geometric",
+                "description": "影像旋轉 (90/180/270)",
+                "opencv_function": "cv2.rotate",
+                "parameters": {
+                    "rotateCode": {
+                        "type": "int",
+                        "default": 0,
+                        "range": [
+                            0,
+                            2
+                        ],
+                        "description": "0=90CW, 1=180, 2=90CCW"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 50,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 500
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Rotate"
+            },
+            "threshold_binary": {
+                "id": "cv_thresh_bin_v1",
+                "name": "Binary Threshold",
+                "category": "thresholding",
+                "description": "二值化",
+                "opencv_function": "cv2.threshold",
+                "parameters": {
+                    "thresh": {
+                        "type": "int",
+                        "default": 127,
+                        "range": [
+                            0,
+                            255
+                        ]
+                    },
+                    "maxval": {
+                        "type": "int",
+                        "default": 255,
+                        "range": [
+                            0,
+                            255
+                        ]
+                    },
+                    "type": {
+                        "type": "int",
+                        "default": 0,
+                        "description": "cv2.THRESH_BINARY"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 10,
+                    "resource_usage": "Very Low",
+                    "dsp_count": 0,
+                    "lut_count": 100
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Binary Threshold"
+            },
+            "adaptive_threshold": {
+                "id": "cv_adaptive_thresh_v1",
+                "name": "Adaptive Threshold",
+                "category": "thresholding",
+                "description": "自適應二值化 (根據區域亮度)",
+                "opencv_function": "cv2.adaptiveThreshold",
+                "parameters": {
+                    "maxValue": {
+                        "type": "int",
+                        "default": 255
+                    },
+                    "blockSize": {
+                        "type": "int",
+                        "default": 11,
+                        "range": [
+                            3,
+                            31
+                        ],
+                        "constraint": "odd"
+                    },
+                    "C": {
+                        "type": "float",
+                        "default": 2,
+                        "range": [
+                            -10,
+                            10
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 150,
+                    "resource_usage": "Medium",
+                    "dsp_count": 0,
+                    "lut_count": 2000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Adaptive Threshold"
+            },
+            "bgr2gray": {
+                "id": "cv_bgr2gray_v1",
+                "name": "BGR to Gray",
+                "category": "color",
+                "description": "轉灰階",
+                "opencv_function": "cv2.cvtColor",
+                "parameters": {},
+                "fpga_constraints": {
+                    "estimated_clk": 10,
+                    "resource_usage": "Very Low",
+                    "dsp_count": 0,
+                    "lut_count": 200
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "BGR to Gray"
+            },
+            "bgr2hsv": {
+                "id": "cv_bgr2hsv_v1",
+                "name": "BGR to HSV",
+                "category": "color",
+                "description": "轉 HSV 色彩空間",
+                "opencv_function": "cv2.cvtColor",
+                "parameters": {},
+                "fpga_constraints": {
+                    "estimated_clk": 20,
+                    "resource_usage": "Low",
+                    "dsp_count": 2,
+                    "lut_count": 800
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "BGR to HSV"
+            },
+            "in_range": {
+                "id": "cv_in_range_v1",
+                "name": "In Range (Color Mask)",
+                "category": "color",
+                "description": "顏色範圍遮罩",
+                "opencv_function": "cv2.inRange",
+                "parameters": {
+                    "lower_b": {
+                        "type": "int",
+                        "default": 0
+                    },
+                    "lower_g": {
+                        "type": "int",
+                        "default": 0
+                    },
+                    "lower_r": {
+                        "type": "int",
+                        "default": 0
+                    },
+                    "upper_b": {
+                        "type": "int",
+                        "default": 255
+                    },
+                    "upper_g": {
+                        "type": "int",
+                        "default": 255
+                    },
+                    "upper_r": {
+                        "type": "int",
+                        "default": 255
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 15,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 300
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "In Range (Color Mask)"
+            },
+            "harris_corner": {
+                "id": "cv_harris_v1",
+                "name": "Harris Corner",
+                "category": "feature_detection",
+                "description": "Harris 角點檢測",
+                "opencv_function": "cv2.cornerHarris",
+                "parameters": {
+                    "blockSize": {
+                        "type": "int",
+                        "default": 2,
+                        "range": [
+                            1,
+                            10
+                        ]
+                    },
+                    "ksize": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            9
+                        ],
+                        "constraint": "odd"
+                    },
+                    "k": {
+                        "type": "float",
+                        "default": 0.04,
+                        "range": [
+                            0.01,
+                            0.1
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 250,
+                    "resource_usage": "Medium",
+                    "dsp_count": 6,
+                    "lut_count": 4000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Harris Corner"
+            },
+            "fast_detector": {
+                "id": "cv_fast_v1",
+                "name": "FAST Detector",
+                "category": "feature_detection",
+                "description": "FAST 特徵點檢測",
+                "opencv_function": "cv2.FastFeatureDetector_create",
+                "parameters": {
+                    "threshold": {
+                        "type": "int",
+                        "default": 10,
+                        "range": [
+                            0,
+                            100
+                        ]
+                    },
+                    "nonmaxSuppression": {
+                        "type": "bool",
+                        "default": true
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 100,
+                    "resource_usage": "Low",
+                    "dsp_count": 0,
+                    "lut_count": 1500
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "FAST Detector"
+            },
+            "bitwise_not": {
+                "id": "cv_bitwise_not_v1",
+                "name": "Bitwise NOT",
+                "category": "arithmetic",
+                "description": "反相",
+                "opencv_function": "cv2.bitwise_not",
+                "parameters": {},
+                "fpga_constraints": {
+                    "estimated_clk": 5,
+                    "resource_usage": "Very Low"
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Bitwise NOT"
+            },
+            "equalize_hist": {
+                "id": "cv_equalize_hist_v1",
+                "name": "Histogram Equalization",
+                "category": "enhancement",
+                "description": "直方圖均衡化 (僅支援灰階)",
+                "opencv_function": "cv2.equalizeHist",
+                "parameters": {},
+                "fpga_constraints": {
+                    "estimated_clk": 200,
+                    "resource_usage": "Medium",
+                    "bram_kb": 18
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Standard_Lib_2025",
+                "name_zh": "Histogram Equalization"
+            },
+            "find_contours": {
+                "id": "cv_find_contours_v1",
+                "name": "Find Contours (Draw Boxes)",
+                "category": "analysis",
+                "description": "找出輪廓並繪製邊界框 (Bounding Boxes)",
+                "opencv_function": "cv2.findContours",
+                "parameters": {
+                    "mode": {
+                        "type": "int",
+                        "default": 1,
+                        "description": "Retrieval Mode (0=External, 1=List, 2=CComp, 3=Tree)"
+                    },
+                    "method": {
+                        "type": "int",
+                        "default": 2,
+                        "description": "Approx Method (1=None, 2=Simple)"
+                    },
+                    "min_area": {
+                        "type": "int",
+                        "default": 100,
+                        "range": [
+                            0,
+                            10000
+                        ],
+                        "description": "最小面積過濾"
+                    },
+                    "draw_on_original": {
+                        "type": "bool",
+                        "default": false,
+                        "description": "是否繪製在原始影像上 (需由 Processor 支援緩存)"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 5000,
+                    "resource_usage": "High",
+                    "dsp_count": 0,
+                    "lut_count": 6000,
+                    "notes": "Serial processing required"
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Template_Expansion",
+                "name_zh": "Find Contours (Draw Boxes)"
+            },
+            "cascade_classifier": {
+                "id": "cv_cascade_v1",
+                "name": "Haar Cascade Classifier",
+                "category": "detection",
+                "description": "Haar 特徵分類器 (人臉/眼睛/車輛)",
+                "opencv_function": "cv2.CascadeClassifier",
+                "parameters": {
+                    "model_type": {
+                        "type": "string",
+                        "default": "haarcascade_frontalface_default.xml",
+                        "options": [
+                            "haarcascade_frontalface_default.xml",
+                            "haarcascade_eye.xml",
+                            "haarcascade_fullbody.xml",
+                            "haarcascade_car.xml"
+                        ],
+                        "description": "模型檔案"
+                    },
+                    "scaleFactor": {
+                        "type": "float",
+                        "default": 1.1,
+                        "range": [
+                            1.01,
+                            2.0
+                        ]
+                    },
+                    "minNeighbors": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            10
+                        ]
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 50000,
+                    "resource_usage": "Very High",
+                    "dsp_count": 20,
+                    "lut_count": 30000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Template_Expansion",
+                "name_zh": "Haar Cascade Classifier"
+            },
+            "hog_descriptor": {
+                "id": "cv_hog_v1",
+                "name": "HOG Detector (Pedestrian)",
+                "category": "detection",
+                "description": "HOG + SVM 行人偵測",
+                "opencv_function": "cv2.HOGDescriptor",
+                "parameters": {
+                    "winStride": {
+                        "type": "tuple",
+                        "default": [
+                            8,
+                            8
+                        ]
+                    },
+                    "padding": {
+                        "type": "tuple",
+                        "default": [
+                            8,
+                            8
+                        ]
+                    },
+                    "scale": {
+                        "type": "float",
+                        "default": 1.05
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 80000,
+                    "resource_usage": "Very High",
+                    "dsp_count": 40,
+                    "lut_count": 50000
+                },
+                "date_added": "2026-01-20",
+                "author": "NKUST_Template_Expansion",
+                "name_zh": "HOG Detector (Pedestrian)"
             }
         },
         "contributed": {
@@ -404,12 +1176,13 @@
         }
     },
     "_metadata": {
-        "total_algorithms": 7,
-        "official_count": 6,
+        "total_algorithms": 31,
+        "official_count": 30,
         "contributed_count": 1,
         "maintainers": [
             "NKUST_Vision_Lab"
         ],
-        "license": "MIT"
+        "license": "MIT",
+        "last_updated": "2026-01-20T17:01:40.311324"
     }
 }

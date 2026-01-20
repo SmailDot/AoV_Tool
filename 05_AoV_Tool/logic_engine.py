@@ -205,6 +205,7 @@ class BridgeBuilder:
                     "description": algo_data['description'],
                     "fpga_constraints": algo_data['fpga_constraints'],
                     "parameters": algo_data.get('parameters', {}),
+                    "opencv_function": algo_data.get('opencv_function', None),
                     "source": algo_data.get('_library_type', 'official'),
                     "next_node_id": f"node_{idx + 1}" if idx < len(skeleton_list) - 1 else None
                 }
