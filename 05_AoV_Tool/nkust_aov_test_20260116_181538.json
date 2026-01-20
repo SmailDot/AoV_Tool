@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "project_name": "coin",
+    "author": "test",
+    "created_at": "2026-01-16 18:15:38",
+    "notes": "完美硬幣辨識",
+    "version": "1.0",
+    "schema_type": "NKUST_AoV_Project",
+    "lab": "NKUST Vision Lab"
+  },
+  "pipeline": [
+    {
+      "id": "node_0",
+      "name": "Gaussian Blur",
+      "function": "GaussianBlur",
+      "category": "preprocessing",
+      "description": "平滑濾波器，用於降噪與模糊處理",
+      "fpga_constraints": {
+        "estimated_clk": 150,
+        "resource_usage": "Medium",
+        "latency_type": "Pipeline",
+        "dsp_count": 4,
+        "lut_count": 2500,
+        "bram_kb": 18,
+        "notes": "Kernel 越大，資源消耗越高。建議 5x5 或 7x7。"
+      },
+      "parameters": {
+        "ksize": {
+          "type": "tuple",
+          "default": [
+            9,
+            9
+          ],
+          "range": [
+            [
+              3,
+              3
+            ],
+            [
+              31,
+              31
+            ]
+          ],
+          "constraint": "必須為奇數",
+          "description": "Kernel 大小（更大的值可更強力去除紋理）"
+        },
+        "sigmaX": {
+          "type": "float",
+          "default": 2.0,
+          "range": [
+            0,
+            10
+          ],
+          "description": "X 方向標準差（更大的值模糊更強）"
+        },
+        "sigmaY": {
+          "type": "float",
+          "default": 0,
+          "range": [
+            0,
+            10
+          ],
+          "description": "Y 方向標準差（0 表示自動計算）"
+        }
+      },
+      "source": "official",
+      "next_node_id": "node_1"
+    },
+    {
+      "id": "node_1",
+      "name": "Canny Edge Detection",
+      "function": "Canny",
+      "category": "edge_detection",
+      "description": "經典邊緣檢測演算法，包含梯度計算與非極大值抑制",
+      "fpga_constraints": {
+        "estimated_clk": 450,
+        "resource_usage": "High",
+        "latency_type": "Pipeline",
+        "dsp_count": 12,
+        "lut_count": 8500,
+        "bram_kb": 72,
+        "notes": "包含 Sobel, NMS, Hysteresis 三大模組。建議預留充足資源。"
+      },
+      "parameters": {
+        "threshold1": {
+          "type": "int",
+          "default": 200,
+          "range": [
+            0,
+            255
+          ],
+          "description": "第一閾值（低閾值）"
+        },
+        "threshold2": {
+          "type": "int",
+          "default": 200,
+          "range": [
+            0,
+            255
+          ],
+          "description": "第二閾值（高閾值）"
+        },
+        "apertureSize": {
+          "type": "int",
+          "default": 2,
+          "range": [
+            3,
+            7
+          ],
+          "constraint": "必須為奇數",
+          "description": "Sobel 算子的 Aperture 大小"
+        },
+        "L2gradient": {
+          "type": "bool",
+          "default": false,
+          "description": "是否使用 L2 範數計算梯度"
+        }
+      },
+      "source": "official",
+      "next_node_id": "node_2",
+      "_enabled": true
+    },
+    {
+      "id": "node_2",
+      "name": "Hough Circle Transform",
+      "function": "HoughCircles",
+      "category": "shape_detection",
+      "description": "霍夫圓形檢測，用於辨識圓形物體",
+      "fpga_constraints": {
+        "estimated_clk": 8500,
+        "resource_usage": "Very High",
+        "latency_type": "Iterative",
+        "dsp_count": 24,
+        "lut_count": 45000,
+        "bram_kb": 512,
+        "notes": "極度耗時！建議在 FPGA 上使用硬體加速或考慮替代方案（如 FindContours）。"
+      },
+      "parameters": {
+        "method": {
+          "type": "int",
+          "default": "cv2.HOUGH_GRADIENT",
+          "description": "檢測方法"
+        },
+        "dp": {
+          "type": "float",
+          "default": 1.0,
+          "range": [
+            1.0,
+            3.0
+          ],
+          "description": "累加器解析度與圖像解析度的反比"
+        },
+        "minDist": {
+          "type": "int",
+          "default": 74,
+          "range": [
+            10,
+            200
+          ],
+          "description": "檢測到的圓心之間的最小距離（至少應為影像高度的1/8）"
+        },
+        "param1": {
+          "type": "int",
+          "default": 8,
+          "range": [
+            10,
+            200
+          ],
+          "description": "Canny 邊緣檢測的高閾值"
+        },
+        "param2": {
+          "type": "int",
+          "default": 25,
+          "range": [
+            10,
+            100
+          ],
+          "description": "累加器閾值（更高的值 = 更少誤檢，建議 >= 50）"
+        },
+        "minRadius": {
+          "type": "int",
+          "default": 11,
+          "range": [
+            0,
+            500
+          ],
+          "description": "最小圓半徑（避免偵測到小點）"
+        },
+        "maxRadius": {
+          "type": "int",
+          "default": 33,
+          "range": [
+            0,
+            500
+          ],
+          "description": "最大圓半徑（避免偵測到大區域）"
+        }
+      },
+      "source": "official",
+      "next_node_id": null
+    }
+  ],
+  "hardware_summary": {
+    "total_clk": 9100,
+    "total_nodes": 3,
+    "resource_distribution": {
+      "Low": 0,
+      "Medium": 1,
+      "High": 1,
+      "Very High": 1,
+      "Unknown": 0
+    },
+    "estimated_fps_1080p": 0.01,
+    "complexity_level": "Complex"
+  },
+  "_readme": {
+    "purpose": "此檔案為 NKUST AoV Tool 專案檔，包含完整的演算法流程與 FPGA 約束資訊。",
+    "how_to_use": "請在 AoV Tool 中使用「匯入專案」功能載入此檔案。",
+    "maintainer": "NKUST Vision Lab"
+  }
+}

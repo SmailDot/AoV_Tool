@@ -14,8 +14,8 @@
                     "ksize": {
                         "type": "tuple",
                         "default": [
-                            5,
-                            5
+                            9,
+                            9
                         ],
                         "range": [
                             [
@@ -28,16 +28,16 @@
                             ]
                         ],
                         "constraint": "必須為奇數",
-                        "description": "Kernel 大小"
+                        "description": "Kernel 大小（更大的值可更強力去除紋理）"
                     },
                     "sigmaX": {
                         "type": "float",
-                        "default": 0,
+                        "default": 2.0,
                         "range": [
                             0,
                             10
                         ],
-                        "description": "X 方向標準差（0 表示自動計算）"
+                        "description": "X 方向標準差（更大的值模糊更強）"
                     },
                     "sigmaY": {
                         "type": "float",
@@ -59,7 +59,8 @@
                     "notes": "Kernel 越大，資源消耗越高。建議 5x5 或 7x7。"
                 },
                 "author": "NKUST_Vision_Lab",
-                "date_added": "2024-09-01"
+                "date_added": "2024-09-01",
+                "name_zh": "高斯模糊"
             },
             "canny_edge": {
                 "id": "cv_canny_v1",
@@ -112,7 +113,8 @@
                     "notes": "包含 Sobel, NMS, Hysteresis 三大模組。建議預留充足資源。"
                 },
                 "author": "NKUST_Vision_Lab",
-                "date_added": "2024-09-01"
+                "date_added": "2024-09-01",
+                "name_zh": "Canny邊緣偵測"
             },
             "dilate": {
                 "id": "cv_dilate_v1",
@@ -146,7 +148,8 @@
                     "notes": "單次 Dilate 非常輕量。但多次迭代會累積延遲。"
                 },
                 "author": "NKUST_Vision_Lab",
-                "date_added": "2024-09-01"
+                "date_added": "2024-09-01",
+                "name_zh": "膨脹運算"
             },
             "hough_circles": {
                 "id": "cv_hough_circles_v1",
@@ -171,12 +174,12 @@
                     },
                     "minDist": {
                         "type": "int",
-                        "default": 30,
+                        "default": 50,
                         "range": [
                             10,
                             200
                         ],
-                        "description": "檢測到的圓心之間的最小距離"
+                        "description": "檢測到的圓心之間的最小距離（至少應為影像高度的1/8）"
                     },
                     "param1": {
                         "type": "int",
@@ -189,30 +192,30 @@
                     },
                     "param2": {
                         "type": "int",
-                        "default": 30,
+                        "default": 50,
                         "range": [
                             10,
                             100
                         ],
-                        "description": "累加器閾值"
+                        "description": "累加器閾值（更高的值 = 更少誤檢，建議 >= 50）"
                     },
                     "minRadius": {
                         "type": "int",
-                        "default": 0,
+                        "default": 20,
                         "range": [
                             0,
                             500
                         ],
-                        "description": "最小圓半徑"
+                        "description": "最小圓半徑（避免偵測到小點）"
                     },
                     "maxRadius": {
                         "type": "int",
-                        "default": 0,
+                        "default": 100,
                         "range": [
                             0,
                             500
                         ],
-                        "description": "最大圓半徑（0 表示不限制）"
+                        "description": "最大圓半徑（避免偵測到大區域）"
                     }
                 },
                 "fpga_constraints": {
@@ -225,7 +228,127 @@
                     "notes": "極度耗時！建議在 FPGA 上使用硬體加速或考慮替代方案（如 FindContours）。"
                 },
                 "author": "NKUST_Vision_Lab",
-                "date_added": "2024-09-01"
+                "date_added": "2024-09-01",
+                "name_zh": "霍夫圓偵測"
+            },
+            "background_subtractor": {
+                "id": "cv_mog2_v1",
+                "name": "前後景分割 (MOG2)",
+                "category": "segmentation",
+                "description": "混合高斯模型背景分割，用於偵測移動物體",
+                "opencv_function": "cv2.createBackgroundSubtractorMOG2",
+                "parameters": {
+                    "history": {
+                        "type": "int",
+                        "default": 500,
+                        "range": [
+                            1,
+                            10000
+                        ],
+                        "description": "歷史幀數量"
+                    },
+                    "varThreshold": {
+                        "type": "float",
+                        "default": 16.0,
+                        "range": [
+                            0,
+                            255
+                        ],
+                        "description": "閾值，決定前景/背景"
+                    },
+                    "detectShadows": {
+                        "type": "bool",
+                        "default": true,
+                        "description": "是否偵測陰影"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 3500,
+                    "resource_usage": "High",
+                    "latency_type": "Iterative",
+                    "dsp_count": 8,
+                    "lut_count": 5000,
+                    "bram_kb": 64,
+                    "notes": "需要Frame Buffer，適合視訊處理"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-16",
+                "name_zh": "前後景分割"
+            },
+            "optical_flow": {
+                "id": "cv_farneback_v1",
+                "name": "光流演算法 (Farneback)",
+                "category": "motion_analysis",
+                "description": "密集光流估計，用於追蹤像素運動",
+                "opencv_function": "cv2.calcOpticalFlowFarneback",
+                "parameters": {
+                    "pyr_scale": {
+                        "type": "float",
+                        "default": 0.5,
+                        "range": [
+                            0.1,
+                            1.0
+                        ],
+                        "description": "金字塔縮放比例"
+                    },
+                    "levels": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            8
+                        ],
+                        "description": "金字塔層數"
+                    },
+                    "winsize": {
+                        "type": "int",
+                        "default": 15,
+                        "range": [
+                            5,
+                            50
+                        ],
+                        "description": "平均窗口大小"
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 3,
+                        "range": [
+                            1,
+                            10
+                        ],
+                        "description": "迭代次數"
+                    },
+                    "poly_n": {
+                        "type": "int",
+                        "default": 5,
+                        "range": [
+                            5,
+                            7
+                        ],
+                        "description": "像素鄰域大小"
+                    },
+                    "poly_sigma": {
+                        "type": "float",
+                        "default": 1.2,
+                        "range": [
+                            1.1,
+                            2.0
+                        ],
+                        "description": "高斯標準差"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 15000,
+                    "resource_usage": "Very High",
+                    "latency_type": "Iterative",
+                    "dsp_count": 16,
+                    "lut_count": 12000,
+                    "bram_kb": 128,
+                    "notes": "計算量極大，建議降低解析度或使用疏性光流"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-16",
+                "name_zh": "光流估計"
             }
         },
         "contributed": {
@@ -275,13 +398,14 @@
                 },
                 "author": "Student_2025_CoinRecognition",
                 "date_added": "2025-01-09",
-                "contributor_note": "此演算法在硬幣辨識專案中解決反光問題時被發現非常有效。"
+                "contributor_note": "此演算法在硬幣辨識專案中解決反光問題時被發現非常有效。",
+                "name_zh": "CLAHE增強"
             }
         }
     },
     "_metadata": {
-        "total_algorithms": 5,
-        "official_count": 4,
+        "total_algorithms": 7,
+        "official_count": 6,
         "contributed_count": 1,
         "maintainers": [
             "NKUST_Vision_Lab"
