@@ -1,87 +1,81 @@
 # n8n AI Integration Guide
 
-> **For n8n AI Agents & Workflow Builders**
-> This document describes how to programmatically interact with the NKUST AoV Tool codebase.
+> **For n8n Workflow Builders**
+> This document describes how to integrate the NKUST AoV Tool into your n8n workflows using the unified adapter.
 
-## 1. Core Architecture for Automation
-The system is designed to be modular. n8n workflows should interact with specific modules rather than the UI (`aov_app.py`).
+## 1. Quick Start (The Adapter Way)
 
-| Module | Purpose | Key Method | Return Type |
-|--------|---------|------------|-------------|
-| `logic_engine.py` | **Planner**. Converts text to pipeline JSON. | `process_user_query(text)` | `List[Dict]` (Pipeline JSON) |
-| `processor.py` | **Executor**. Runs OpenCV ops. | `execute_pipeline(img, json)` | `np.ndarray` (Image) |
-| `processor.py` | **Introspection**. Lists capabilities. | `get_supported_operations()` | `Dict` (Schema) |
-| `library_manager.py` | **Knowledge Base**. Manages algorithms. | `list_algorithms()` | `List[Dict]` |
+The easiest way to use this tool in n8n is via the **Execute Command** node calling `n8n_adapter.py`. This adapter handles:
+- LLM interaction (OpenAI/Mock)
+- Image I/O (OpenCV)
+- JSON formatting for n8n (handling stdout/stderr cleanly)
 
-## 2. Introspection (How to learn what I can do)
-To avoid hallucinations, AI agents should query the `ImageProcessor` to understand available tools.
-
-```python
-from processor import ImageProcessor
-proc = ImageProcessor()
-
-# Returns a JSON schema of all supported operations and their descriptions
-capabilities = proc.get_supported_operations()
-print(json.dumps(capabilities, indent=2))
+### n8n Node Configuration
+- **Node Type**: Execute Command
+- **Command**:
+```bash
+python "D:\NKUST_LAB_Work_Data\Lab work\cv-algorithm-study\05_AoV_Tool\n8n_adapter.py" \
+  --image "/path/to/input.jpg" \
+  --query "Detect coins and calculate their value" \
+  --output "/path/to/output.png" \
+  --api_key "sk-..." 
 ```
 
-**Output Example:**
+### Arguments
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--image` | Absolute path to input image | Yes |
+| `--query` | Natural language description of task | Yes |
+| `--output` | Path to save processed image | No (Default: output.png) |
+| `--api_key` | OpenAI API Key. If omitted, tool forces Mock Mode. | No |
+| `--base_url` | Custom LLM URL (e.g. for local models) | No |
+| `--mock` | Force Mock Mode even if API Key is present | No |
+
+## 2. JSON Output Structure
+
+The adapter returns a pure JSON object to stdout, ready for n8n parsing.
+
 ```json
 {
-  "GaussianBlur": {
-    "description": "Apply Gaussian Blur to reduce noise.",
-    "type": "computer_vision_operation"
-  },
-  "Canny": {
-    "description": "Detect edges using Canny algorithm.",
-    "type": "computer_vision_operation"
-  }
+  "status": "success",
+  "output_path": "D:\\...\\result.png",
+  "query": "detect coins",
+  "used_mock": false,
+  "logs": "[AI Reasoning] Since the image is noisy, I suggest using the advanced detector..."
 }
 ```
 
-## 3. Pipeline JSON Schema
-The core data structure is the **Pipeline List**. AI agents should generate JSON matching this format:
+## 3. Advanced: Architecture (Class-Based)
 
-```json
-[
-  {
-    "id": "node_0",
-    "function": "GaussianBlur",  // Must match a key in get_supported_operations()
-    "parameters": {
-      "ksize": {"default": [5, 5]},
-      "sigmaX": {"default": 0}
-    },
-    "fpga_constraints": {
-      "estimated_clk": 150,
-      "resource_usage": "Medium"
-    }
-  }
-]
-```
-
-## 4. Automation Workflow Example (Python Script)
-An n8n `Execute Command` node can run a script like this to process images without the UI:
+If you are writing a custom Python script node in n8n instead of using the CLI adapter, use the `AoVTool` class.
 
 ```python
-import cv2
-from processor import ImageProcessor
-from logic_engine import LogicEngine
+from n8n_adapter import AoVTool, AoVConfig
 
-# 1. Initialize
-engine = LogicEngine()
-processor = ImageProcessor()
+# 1. Configure
+config = AoVConfig(
+    api_key="sk-...",
+    image_path="input.jpg",
+    user_query="detect circles",
+    output_path="result.png"
+)
 
-# 2. Plan (Text -> JSON)
-pipeline = engine.process_user_query("Detect edges in this image")
+# 2. Initialize Tool
+tool = AoVTool(config)
 
-# 3. Execute (Image + JSON -> Image)
-img = cv2.imread("input.jpg")
-result = processor.execute_pipeline(img, pipeline)
-
-# 4. Save
-cv2.imwrite("output.jpg", result)
+# 3. Run
+try:
+    result_path = tool.run()
+    print(f"Success: {result_path}")
+except Exception as e:
+    print(f"Error: {e}")
 ```
 
-## 5. File Structure for Context
-- **`tech_lib.json`**: The Single Source of Truth for algorithm data. Read this to understand parameter constraints.
-- **`processor.py`**: The execution logic. Read `operation_map` to see implementation details.
+## 4. Supported Algorithms
+
+The tool supports 30+ algorithms including:
+- **Basic**: GaussianBlur, Canny, Dilate, Erode
+- **Advanced**: HoughCircles, FindContours, OpticalFlow
+- **Specialized**: `advanced_coin_detection` (Automatically triggered for coin tasks)
+
+See `tech_lib.json` for full list and parameter constraints.

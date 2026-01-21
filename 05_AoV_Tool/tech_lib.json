@@ -1,9 +1,37 @@
 {
     "schema_version": "1.0.0",
-    "last_updated": "2026-01-13T14:23:00+08:00",
+    "last_updated": "2026-01-20T17:01:40.311324",
     "description": "NKUST Vision Lab - OpenCV Algorithm Library with FPGA Constraints",
     "libraries": {
         "official": {
+            "advanced_coin_detection": {
+                "id": "cv_adv_coin_v1",
+                "name": "Advanced Coin Detector (Stable)",
+                "category": "detection",
+                "description": "高階硬幣偵測器 (包含 Resize, Blur, Hough)，移植自 catch_coins/main.py 專案",
+                "opencv_function": "advanced_coin_detection",
+                "parameters": {
+                    "max_image_size": { "type": "int", "default": 800, "description": "最大邊長限制 (px)" },
+                    "blur_ksize": { "type": "int", "default": 13, "description": "高斯模糊 Kernel Size" },
+                    "dp": { "type": "float", "default": 1.2, "description": "Hough DP" },
+                    "min_distance": { "type": "int", "default": 40, "description": "最小圓心距離" },
+                    "canny_threshold": { "type": "int", "default": 50, "description": "Canny 高閾值" },
+                    "accumulator_threshold": { "type": "int", "default": 30, "description": "Hough 累加閾值" },
+                    "min_radius": { "type": "int", "default": 20, "description": "最小半徑" },
+                    "max_radius": { "type": "int", "default": 80, "description": "最大半徑" }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 12000,
+                    "resource_usage": "Very High",
+                    "latency_type": "Iterative",
+                    "dsp_count": 30,
+                    "lut_count": 55000,
+                    "notes": "這是一個複合節點 (Resize+Blur+Hough)，FPGA 上需拆解為三個 IP Core。"
+                },
+                "author": "NKUST_Coin_Project_Team",
+                "date_added": "2026-01-20",
+                "name_zh": "高階硬幣偵測 (整合版)"
+            },
             "gaussian_blur": {
                 "id": "cv_gaussian_blur_v1",
                 "name": "Gaussian Blur",

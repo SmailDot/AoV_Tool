@@ -1,27 +1,3 @@
-# n8n Context Bundle
-
-> **Context Package for AI Agents**
-> This bundle contains everything an AI Agent needs to understand and use the NKUST AoV Tool.
-
----
-
-## 1. Integration Guide
-(See `n8n_integration_guide.md` for CLI usage)
-
-### Core Concept: The Adapter Pattern
-The `n8n_adapter.py` script acts as a bridge between n8n (JSON-based) and the Python backend. It enforces a strict schema for inputs and outputs.
-
-### Critical Rules for Agents
-1. **Always use the Adapter**: Do not call `processor.py` directly unless you are debugging.
-2. **Check Logs**: The JSON output contains a `logs` field with reasoning. Use this to verify why specific algorithms were chosen.
-3. **Coin Detection**: If the query mentions "coins", the system automatically upgrades to the `advanced_coin_detection` node.
-
----
-
-## 2. Source Code Reference
-
-### `n8n_adapter.py` (Entry Point)
-```python
 import argparse
 import os
 import cv2
@@ -147,24 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
-
----
-
-## 3. Algorithm Capabilities (Summary)
-
-The tool supports a wide range of algorithms defined in `tech_lib.json`.
-
-| Category | Algorithms |
-|----------|------------|
-| **Preprocessing** | GaussianBlur, MedianBlur, BilateralFilter, CLAHE |
-| **Edge Detection** | Canny, Sobel, Laplacian |
-| **Morphology** | Dilate, Erode, Open, Close, Gradient |
-| **Detection** | **AdvancedCoinDetection** (New!), HoughCircles, CascadeClassifier, HOG |
-| **Feature** | HarrisCorner, FAST |
-| **Analysis** | FindContours, OpticalFlow, BackgroundSubtractor |
-
-### New Feature: Advanced Coin Detection
-- **Trigger**: Query contains "coin" or "硬幣"
-- **Logic**: Combines Resize + GaussianBlur + HoughCircles with optimized parameters
-- **Source**: Ported from `catch_coins` project logic

@@ -37,24 +37,33 @@ class PromptMaster:
     LLM Orchestrator - 負責設計 Prompt 並呼叫 LLM
     """
     
-    # Prompt 模板（嚴格控制 LLM 輸出格式）
+    # Prompt 模板（升級為支援 Reasoning 與參數建議）
     SYSTEM_PROMPT = """You are an expert Computer Vision algorithm advisor for FPGA implementation.
 
 **CRITICAL RULES:**
-1. You MUST ONLY return a JSON array of OpenCV function names.
-2. DO NOT generate any code, explanations, or parameters.
-3. DO NOT use markdown formatting. Return pure JSON only.
-4. Use standard OpenCV function names (e.g., "GaussianBlur", "Canny", "HoughCircles").
-5. Arrange functions in a logical pipeline order.
+1. You MUST return a JSON object with two fields: "reasoning" and "pipeline".
+2. "reasoning": Explain WHY you chose these algorithms and parameters. Be specific.
+3. "pipeline": An array of objects, each with "function" (name) and "params" (optional overrides).
+4. Use standard OpenCV function names or known aliases.
+5. If the user asks for "Coin Detection", prioritize "advanced_coin_detection" node.
 
-**Output Format (STRICT):**
-["FunctionName1", "FunctionName2", "FunctionName3"]
-
-**Example Input:** "Detect edges in a noisy image"
-**Example Output:** ["GaussianBlur", "Canny"]
+**Output Format (STRICT JSON):**
+{
+  "reasoning": "Since the image is noisy, I suggest a larger blur kernel...",
+  "pipeline": [
+    { "function": "GaussianBlur", "params": { "ksize": [7, 7] } },
+    { "function": "Canny", "params": { "threshold1": 30, "threshold2": 100 } }
+  ]
+}
 
 **Example Input:** "Detect coins on a keyboard"
-**Example Output:** ["GaussianBlur", "Canny", "HoughCircles"]
+**Example Output:**
+{
+  "reasoning": "For coins on complex backgrounds, we should use the specialized advanced detector which handles resize and hough transform robustly.",
+  "pipeline": [
+    { "function": "advanced_coin_detection", "params": { "min_radius": 25, "max_radius": 90 } }
+  ]
+}
 """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1"):
@@ -76,16 +85,9 @@ class PromptMaster:
         else:
             self.llm_available = True
     
-    def get_llm_suggestion(self, user_query: str, use_mock: bool = False) -> List[str]:
+    def get_llm_suggestion(self, user_query: str, use_mock: bool = False) -> List[Any]:
         """
-        獲取 LLM 建議的演算法列表
-        
-        Args:
-            user_query: 使用者的自然語言需求（例如：「偵測硬幣」）
-            use_mock: 若為 True，使用 Mock 資料（用於測試）
-        
-        Returns:
-            List[str]: 演算法函數名稱列表（骨架）
+        獲取 LLM 建議的演算法列表 (支援舊版 List[str] 與新版 List[Dict])
         """
         if use_mock or not self.llm_available:
             return self._get_mock_suggestion(user_query)
@@ -100,59 +102,59 @@ class PromptMaster:
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": user_query}
                 ],
-                temperature=0.3,  # 降低隨機性，確保輸出穩定
-                max_tokens=200
+                temperature=0.3,
+                max_tokens=500
             )
             
             raw_output = response.choices[0].message.content.strip()
             
-            # 嚴格解析 JSON
+            # 解析 JSON
             try:
-                skeleton = json.loads(raw_output)
-                if not isinstance(skeleton, list):
-                    raise ValueError("LLM output is not a list")
+                data = json.loads(raw_output)
                 
-                print(f"[Prompt_Master] LLM returned: {skeleton}")
-                return skeleton
+                # Case 1: 新版 Rich Output (Object with reasoning)
+                if isinstance(data, dict) and "pipeline" in data:
+                    print(f"\n[AI Reasoning] {data.get('reasoning', 'No reasoning provided')}")
+                    return data["pipeline"] # 回傳 pipeline list (包含 params)
+                
+                # Case 2: 舊版 Simple Output (List of strings)
+                elif isinstance(data, list):
+                    print("[Prompt_Master] LLM returned simple list format.")
+                    return data
+                
+                else:
+                    raise ValueError("Unknown JSON format")
                 
             except json.JSONDecodeError as e:
                 print(f"[Error] LLM returned invalid JSON: {raw_output}")
-                print(f"  Parse error: {e}")
                 return self._get_fallback_suggestion(user_query)
         
         except Exception as e:
             print(f"[Error] LLM API call failed: {e}")
             return self._get_fallback_suggestion(user_query)
     
-    def _get_mock_suggestion(self, user_query: str) -> List[str]:
+    def _get_mock_suggestion(self, user_query: str) -> List[Any]:
         """
-        Mock LLM 建議（用於測試或無 API Key 情況）
-        
-        使用嚴格的保守參數，避免誤檢
+        Mock LLM 建議 (升級版，回傳 List[Dict] 以支援參數)
         """
         query_lower = user_query.lower()
         
-        # 關鍵字匹配規則（STRICT CONSERVATIVE DEFAULTS）
-        if "coin" in query_lower or "硬幣" in query_lower or "circle" in query_lower:
-            # 硬幣偵測：必須使用嚴格的前處理
-            return ["GaussianBlur", "Canny", "HoughCircles"]
+        if "coin" in query_lower or "硬幣" in query_lower:
+            print("[Mock] Detected 'coin' -> Using Advanced Coin Detector")
+            return [{"function": "advanced_coin_detection"}]
+            
         elif "edge" in query_lower or "邊緣" in query_lower:
-            return ["GaussianBlur", "Canny"]
-        elif "denoise" in query_lower or "降噪" in query_lower or "noise" in query_lower:
-            return ["GaussianBlur", "Morphological_Open"]
-        elif "blur" in query_lower or "模糊" in query_lower:
-            return ["GaussianBlur"]
+            return ["GaussianBlur", "Canny"] # 舊版格式兼容測試
+            
+        elif "denoise" in query_lower or "降噪" in query_lower:
+            return [{"function": "GaussianBlur"}, {"function": "Morphological_Open"}]
+            
         else:
-            # 預設通用前處理流程
             return ["GaussianBlur", "Canny"]
-    
-    def _get_fallback_suggestion(self, user_query: str) -> List[str]:
-        """
-        當 LLM 失敗時的 Fallback 機制
-        """
+
+    def _get_fallback_suggestion(self, user_query: str) -> List[Any]:
         print("[Warning] Using fallback suggestion mechanism.")
         return self._get_mock_suggestion(user_query)
-
 
 # ==================== Bridge_Builder 區域 ====================
 
@@ -162,41 +164,34 @@ class BridgeBuilder:
     """
     
     def __init__(self, library_manager: LibraryManager):
-        """
-        初始化 Bridge Builder
-        
-        Args:
-            library_manager: LibraryManager 實例
-        """
         self.lib_manager = library_manager
-        self.verilog_guru = VerilogGuru()  # Fallback 策略提供者
+        self.verilog_guru = VerilogGuru()
     
-    def hydrate_pipeline(self, skeleton_list: List[str]) -> List[Dict[str, Any]]:
+    def hydrate_pipeline(self, skeleton_list: List[Any]) -> List[Dict[str, Any]]:
         """
-        將 LLM 的骨架（函數列表）附加資料庫資訊（血肉）
-        
-        Args:
-            skeleton_list: LLM 回傳的函數名稱列表
-        
-        Returns:
-            List[Dict]: 完整的 Pipeline 節點列表，每個節點包含：
-                - id: 節點唯一 ID
-                - name: 函數名稱
-                - category: 類別
-                - fpga_constraints: FPGA 約束
-                - parameters: 參數定義
-                - source: "official" / "contributed" / "unknown"
+        將 LLM 的骨架（列表）附加資料庫資訊（血肉）
+        支援輸入格式: List[str] 或 List[Dict] (新版含參數)
         """
         hydrated_pipeline = []
         
-        for idx, func_name in enumerate(skeleton_list):
+        for idx, item in enumerate(skeleton_list):
+            # 正規化輸入：取得名稱與參數覆蓋
+            if isinstance(item, str):
+                func_name = item
+                param_overrides = {}
+            elif isinstance(item, dict):
+                func_name = item.get("function", "Unknown")
+                param_overrides = item.get("params", {})
+            else:
+                continue
+
             print(f"[Bridge_Builder] Hydrating '{func_name}'...")
             
-            # Step 1: 嘗試在資料庫中查找（先查 official，再查 contributed）
+            # Step 1: 查找演算法
             algo_data = self._lookup_algorithm(func_name)
             
             if algo_data:
-                # 成功找到！附加完整資訊
+                # 複製以避免汙染原始資料庫
                 node = {
                     "id": f"node_{idx}",
                     "name": algo_data['name'],
@@ -204,15 +199,22 @@ class BridgeBuilder:
                     "category": algo_data['category'],
                     "description": algo_data['description'],
                     "fpga_constraints": algo_data['fpga_constraints'],
-                    "parameters": algo_data.get('parameters', {}),
+                    "parameters": algo_data.get('parameters', {}).copy(), # Deep copy structure
                     "opencv_function": algo_data.get('opencv_function', None),
                     "source": algo_data.get('_library_type', 'official'),
                     "next_node_id": f"node_{idx + 1}" if idx < len(skeleton_list) - 1 else None
                 }
+                
+                # Step 1.5: 套用 LLM 建議的參數 (Parameter Injection)
+                if param_overrides:
+                    print(f"  [AI] Applying suggested parameters: {param_overrides}")
+                    for p_key, p_val in param_overrides.items():
+                        if p_key in node['parameters']:
+                            node['parameters'][p_key]['default'] = p_val
+                
                 print(f"  [OK] Found in database ({node['source']})")
                 
             else:
-                # 找不到！啟動 Fallback 機制（由 Verilog_Guru 提供）
                 print(f"  [X] Not found in database. Using fallback...")
                 node = self.verilog_guru.create_fallback_node(func_name, idx, len(skeleton_list))
             

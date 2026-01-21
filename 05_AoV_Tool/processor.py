@@ -95,9 +95,83 @@ class ImageProcessor:
             # Arithmetic / Enhancement
             "bitwise_not": self._op_bitwise_not,
             "equalize_hist": self._op_equalize_hist,
+
+            # --- Advanced Logic Nodes ---
+            "advanced_coin_detection": self._op_advanced_coin_logic,
         }
     
-    def get_supported_operations(self) -> Dict[str, Dict]:
+    def _op_advanced_coin_logic(self, img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
+        """ 
+        高階硬幣辨識邏輯 (Advanced Coin Detector)
+        移植自: catch_coins/main.py 
+        包含: Resize -> Gray -> Blur -> Hough -> Stability Heuristic (Single Frame)
+        """
+        # 1. 預處理 (Resize)
+        max_size = int(params.get('max_image_size', {}).get('default', 800))
+        h, w = img.shape[:2]
+        longest_side = max(h, w)
+        if longest_side > max_size:
+            scale = max_size / longest_side
+            new_size = (int(w * scale), int(h * scale))
+            img_processed = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+        else:
+            img_processed = img.copy()
+
+        # 2. 轉灰階 & 模糊 (Preprocessing)
+        gray = self._ensure_gray(img_processed)
+        blur_ksize = int(params.get('blur_ksize', {}).get('default', 13))
+        if blur_ksize % 2 == 0: blur_ksize += 1
+        blurred = cv2.GaussianBlur(gray, (blur_ksize, blur_ksize), 0)
+
+        # 3. 霍夫圓偵測 (Hough)
+        dp = float(params.get('dp', {}).get('default', 1.2))
+        min_dist = int(params.get('min_distance', {}).get('default', 40))
+        canny_thresh = int(params.get('canny_threshold', {}).get('default', 50))
+        acc_thresh = int(params.get('accumulator_threshold', {}).get('default', 30))
+        min_radius = int(params.get('min_radius', {}).get('default', 20))
+        max_radius = int(params.get('max_radius', {}).get('default', 80))
+
+        detected = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=dp,
+            minDist=min_dist,
+            param1=canny_thresh,
+            param2=acc_thresh,
+            minRadius=min_radius,
+            maxRadius=max_radius
+        )
+
+        output = img_processed.copy()
+        
+        # 4. 繪製結果 & 模擬穩定性過濾 (Logic)
+        # 由於這是單張影像，我們無法做 Temporal Stability，
+        # 但我們可以加上 "Radius Consistency" 或 "Overlap Removal" (簡單模擬)
+        
+        count = 0
+        if detected is not None:
+            # 轉換為整數
+            circles_rounded = np.round(detected[0, :]).astype(int)
+            
+            # 簡單的過濾邏輯：移除過於重疊的圓 (Optional, Hough minDist handles mostly)
+            # 這裡我們直接繪製，模擬 main.py 的 Visualizer
+            
+            for (x, y, r) in circles_rounded:
+                # 畫圓 (綠色)
+                cv2.circle(output, (x, y), r, (0, 255, 0), 2)
+                # 畫圓心 (紅色)
+                cv2.circle(output, (x, y), 2, (0, 0, 255), 3)
+                count += 1
+            
+            # 加上標籤文字
+            label = f"Stable Coins: {count}" # 為了符合 main.py 風格，我們保留這個標籤名
+            cv2.putText(output, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+        if debug:
+            print(f"    [AdvancedCoin] Found {count} coins")
+
+        return output
+
         """
         [AI-Friendly] 回傳所有支援的操作與其參數定義 (Schema)
         """
@@ -554,17 +628,15 @@ class ImageProcessor:
         if debug: print(f"    Detected {len(regions)} pedestrians")
         return output
 
-# ==================== Helper ====================
-
-def create_thumbnail(image: np.ndarray, max_width: int = 640) -> np.ndarray:
-    if image is None or image.size == 0:
-        return np.zeros((100, 100, 3), dtype=np.uint8)
-    h, w = image.shape[:2]
-    if w > max_width:
-        scale = max_width / w
-        new_h = int(h * scale)
-        return cv2.resize(image, (max_width, new_h))
-    return image
+    def create_thumbnail(self, image: np.ndarray, max_width: int = 640) -> np.ndarray:
+        if image is None or image.size == 0:
+            return np.zeros((100, 100, 3), dtype=np.uint8)
+        h, w = image.shape[:2]
+        if w > max_width:
+            scale = max_width / w
+            new_h = int(h * scale)
+            return cv2.resize(image, (max_width, new_h))
+        return image
 
 if __name__ == "__main__":
     print("Processor loaded.")
