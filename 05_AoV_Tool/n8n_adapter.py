@@ -57,10 +57,19 @@ class AoVTool:
 
         # 2. Generate Pipeline via Logic Engine
         # print(f"[AoVTool] Processing Query: '{self.config.user_query}'")
-        pipeline = self.logic_engine.process_user_query(
+        llm_result = self.logic_engine.process_user_query(
             self.config.user_query, 
             use_mock_llm=self.config.use_mock_llm
         )
+        
+        # [Refactor Fix] Handle Dict return type from LogicEngine
+        if llm_result.get("error"):
+            raise RuntimeError(f"AI Generation Failed: {llm_result['error']} (Reasoning: {llm_result.get('reasoning')})")
+            
+        pipeline = llm_result["pipeline"]
+        reasoning = llm_result.get("reasoning", "No reasoning provided")
+        
+        print(f"[AoVTool] AI Reasoning: {reasoning}")
         
         # 3. Execute Pipeline via Processor
         # print(f"[AoVTool] Executing Pipeline with {len(pipeline)} nodes...")
