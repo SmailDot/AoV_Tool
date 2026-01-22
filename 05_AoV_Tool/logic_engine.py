@@ -37,44 +37,49 @@ class PromptMaster:
     LLM Orchestrator - 負責設計 Prompt 並呼叫 LLM
     """
     
-    # Prompt 模板（升級為支援 Reasoning 與參數建議）
-    SYSTEM_PROMPT = """You are an expert Computer Vision algorithm advisor for FPGA implementation.
+    SYSTEM_PROMPT = """你是一位資深的電腦視覺演算法架構師 (Senior CV Architect)。
+你的任務是根據使用者的自然語言需求，設計出邏輯嚴謹的 OpenCV Pipeline。
 
-**CRITICAL RULES:**
-1. You MUST return a JSON object with two fields: "reasoning" and "pipeline".
-2. "reasoning": Explain WHY you chose these algorithms and parameters. Be specific.
-3. "pipeline": An array of objects, each with "function" (name) and "params" (optional overrides).
-4. Use standard OpenCV function names or known aliases.
-5. If the user asks for "Coin Detection", prioritize "advanced_coin_detection" node.
+**核心變革 (Graph Logic):**
+我們現在支援 **非線性流程 (DAG)**。你可以設計並行處理的路線，最後再合併。
+- 預設情況下，節點會接收「上一個節點」的輸出。
+- **但你可以明確指定 `inputs`** 來獲取更早之前的節點輸出，實現並行與合併。
 
-**Output Format (STRICT JSON):**
+**輸出格式 (STRICT JSON):**
+1. "reasoning": (String) 繁體中文的設計思路。解釋並行處理的理由（例如：一路做邊緣偵測，一路做色彩過濾，最後 `bitwise_and` 合併）。
+2. "pipeline": (List) 節點列表。
+   - "id": (String) 節點唯一 ID (如 "source", "blur_branch", "color_branch", "merge")。
+   - "function": (String) OpenCV 函數名。
+   - "inputs": (List[String], Optional) 指定輸入來源的 ID。若省略，預設為上一個節點。**"source" 代表原始影像。**
+   - "params": (Dict) 參數。
+
+**合併操作 (Merge Functions):**
+當你需要合併兩條路線時，請使用以下函數：
+- `add`: 影像相加
+- `addWeighted`: 影像權重相加 (Blending)
+- `bitwise_and`: 取交集 (Masking)
+- `bitwise_or`: 取聯集
+- `absdiff`: 取差異
+
+**範例輸入:** "幫我去除背景，保留紅色物體"
+**範例輸出:**
 {
-  "reasoning": "Since the image is noisy, I suggest a larger blur kernel...",
+  "reasoning": "為了精確保留紅色物體，我將採用雙流設計。第一路 (Branch A) 將影像轉為 HSV 並使用 inRange 抓取紅色遮罩。第二路 (Branch B) 保持原圖。最後使用 `bitwise_and` 將原圖與遮罩合併，達成去背效果。",
   "pipeline": [
-    { "function": "GaussianBlur", "params": { "ksize": [7, 7] } },
-    { "function": "Canny", "params": { "threshold1": 30, "threshold2": 100 } }
+    { "id": "to_hsv", "function": "cvtColor", "params": { "code": "COLOR_BGR2HSV" }, "inputs": ["source"] },
+    { "id": "red_mask", "function": "inRange", "params": { "lower": [0, 100, 100], "upper": [10, 255, 255] }, "inputs": ["to_hsv"] },
+    { "id": "result", "function": "bitwise_and", "params": {}, "inputs": ["source", "red_mask"] }
   ]
 }
 
-**Example Input:** "Detect coins on a keyboard"
-**Example Output:**
-{
-  "reasoning": "For coins on complex backgrounds, we should use the specialized advanced detector which handles resize and hough transform robustly.",
-  "pipeline": [
-    { "function": "advanced_coin_detection", "params": { "min_radius": 25, "max_radius": 90 } }
-  ]
-}
+**可用函數庫:**
+- Basic: GaussianBlur, MedianBlur, cvtColor, resize
+- Edge: Canny, Sobel, Laplacian
+- Morph: Morphological_Open, Morphological_Close, dilate, erode
+- Merge: add, addWeighted, bitwise_and, bitwise_or, bitwise_xor, absdiff
 """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1"):
-        """
-        初始化 Prompt Master
-        
-        Args:
-            api_key: OpenAI API Key（若為 None，從環境變數讀取）
-            model: 使用的模型（預設 gpt-4）
-            base_url: API Base URL (預設 OpenAI 官方)
-        """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
         self.base_url = base_url
@@ -84,18 +89,99 @@ class PromptMaster:
             self.llm_available = False
         else:
             self.llm_available = True
+            
+        # [NEW] Default fallback reasoning
+        self.last_reasoning = ""
     
-    def get_llm_suggestion(self, user_query: str, use_mock: bool = False) -> List[Any]:
+    def get_llm_suggestion(self, user_query: str, use_mock: bool = False) -> Dict[str, Any]:
         """
-        獲取 LLM 建議的演算法列表 (支援舊版 List[str] 與新版 List[Dict])
+        獲取 LLM 建議
         """
-        if use_mock or not self.llm_available:
+        if use_mock:
             return self._get_mock_suggestion(user_query)
+            
+        if not self.llm_available:
+            return {
+                "pipeline": self._get_fallback_pipeline(user_query),
+                "reasoning": "無法連線至 LLM (Missing API Key)，已切換至 Fallback 模式。",
+                "error": "Missing API Key"
+            }
         
+        # [Strategy 1] Google Native SDK (Priority for Gemini models)
+        if "google" in self.base_url or "generativelanguage" in self.base_url:
+            return self._call_google_native(user_query)
+
+        # [Strategy 2] OpenAI Compatible SDK (Default)
+        return self._call_openai_compatible(user_query)
+
+    def _call_google_native(self, user_query: str) -> Dict[str, Any]:
+        """
+        使用 Google Generative AI SDK (google-generativeai)
+        """
+        try:
+            import google.generativeai as genai
+            
+            print(f"[LLM-Google] Using Native SDK for {self.model}")
+            genai.configure(api_key=self.api_key)
+            
+            # Clean model name (remove 'google/' prefix if exists)
+            model_name = self.model.replace("google/", "")
+            
+            # Create Model
+            # Note: system_instruction is supported in newer SDKs
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=self.SYSTEM_PROMPT,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            
+            response = model.generate_content(user_query)
+            raw_output = response.text
+            
+            # Parse JSON
+            data = json.loads(raw_output)
+            
+            if isinstance(data, dict) and "pipeline" in data:
+                return {
+                    "pipeline": data["pipeline"],
+                    "reasoning": data.get("reasoning", "AI 未提供理由"),
+                    "error": None
+                }
+            else:
+                return {
+                    "pipeline": self._get_fallback_pipeline(user_query),
+                    "reasoning": f"Format Error: {raw_output[:100]}",
+                    "error": "Invalid JSON format"
+                }
+                
+        except Exception as e:
+            return {
+                "pipeline": [],
+                "reasoning": f"Google SDK Error: {str(e)}",
+                "error": str(e)
+            }
+
+    def _call_openai_compatible(self, user_query: str) -> Dict[str, Any]:
+        """
+        使用 OpenAI SDK (OpenAI, Groq, DeepSeek, Local)
+        """
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            import httpx
             
+            print(f"[LLM-OpenAI] Calling {self.model} at {self.base_url}...")
+            
+            try:
+                client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            except TypeError as te:
+                if "proxies" in str(te):
+                    return {
+                        "pipeline": [],
+                        "reasoning": "版本衝突偵測: openai 與 httpx 套件版本不相容。",
+                        "error": "Dependency Error: Please run `pip install -U openai httpx`"
+                    }
+                raise te
+
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -108,55 +194,111 @@ class PromptMaster:
             
             raw_output = response.choices[0].message.content.strip()
             
-            # 解析 JSON
-            try:
-                data = json.loads(raw_output)
+            # Clean up markdown code blocks
+            if "```" in raw_output:
+                raw_output = raw_output.replace("```json", "").replace("```", "").strip()
+
+            data = json.loads(raw_output)
+            
+            if isinstance(data, dict) and "pipeline" in data:
+                return {
+                    "pipeline": data["pipeline"],
+                    "reasoning": data.get("reasoning", "AI 未提供理由"),
+                    "error": None
+                }
+            elif isinstance(data, list):
+                return {
+                    "pipeline": data,
+                    "reasoning": "AI 回傳了舊版格式 (List Only)",
+                    "error": None
+                }
+            else:
+                raise ValueError(f"Unknown JSON format")
                 
-                # Case 1: 新版 Rich Output (Object with reasoning)
-                if isinstance(data, dict) and "pipeline" in data:
-                    print(f"\n[AI Reasoning] {data.get('reasoning', 'No reasoning provided')}")
-                    return data["pipeline"] # 回傳 pipeline list (包含 params)
-                
-                # Case 2: 舊版 Simple Output (List of strings)
-                elif isinstance(data, list):
-                    print("[Prompt_Master] LLM returned simple list format.")
-                    return data
-                
-                else:
-                    raise ValueError("Unknown JSON format")
-                
-            except json.JSONDecodeError as e:
-                print(f"[Error] LLM returned invalid JSON: {raw_output}")
-                return self._get_fallback_suggestion(user_query)
-        
         except Exception as e:
-            print(f"[Error] LLM API call failed: {e}")
-            return self._get_fallback_suggestion(user_query)
+            return {
+                "pipeline": [], 
+                "reasoning": f"API 連線失敗: {str(e)}",
+                "error": str(e)
+            }
     
-    def _get_mock_suggestion(self, user_query: str) -> List[Any]:
+    def _get_mock_suggestion(self, user_query: str) -> Dict[str, Any]:
         """
-        Mock LLM 建議 (升級版，回傳 List[Dict] 以支援參數)
+        Mock LLM 建議
         """
         query_lower = user_query.lower()
+        pipeline = []
+        reasoning = "這是 Mock 模式 (無網路/無 Key) 的預設建議。"
         
         if "coin" in query_lower or "硬幣" in query_lower:
-            print("[Mock] Detected 'coin' -> Using Advanced Coin Detector")
-            return [{"function": "advanced_coin_detection"}]
+            pipeline = [{"function": "advanced_coin_detection"}]
+            reasoning = "[Mock] 偵測到關鍵字 '硬幣'。系統推薦使用 Advanced Coin Detector，這是一個針對圓形物體優化的複合演算法。"
             
         elif "edge" in query_lower or "邊緣" in query_lower:
-            return ["GaussianBlur", "Canny"] # 舊版格式兼容測試
+            pipeline = ["GaussianBlur", "Canny"]
+            reasoning = "[Mock] 偵測到關鍵字 '邊緣'。推薦標準流程：先使用高斯模糊 (GaussianBlur) 降噪，再使用 Canny 算子抓取邊緣。"
             
         elif "denoise" in query_lower or "降噪" in query_lower:
-            return [{"function": "GaussianBlur"}, {"function": "Morphological_Open"}]
+            pipeline = [{"function": "GaussianBlur"}, {"function": "Morphological_Open"}]
+            reasoning = "[Mock] 偵測到關鍵字 '降噪'。推薦使用高斯模糊搭配形態學開運算 (Opening) 來去除背景雜訊。"
             
         else:
-            return ["GaussianBlur", "Canny"]
+            pipeline = ["GaussianBlur", "Canny"]
+            reasoning = "[Mock] 未偵測到特定關鍵字。系統預設提供邊緣檢測流程供您參考。"
 
-    def _get_fallback_suggestion(self, user_query: str) -> List[Any]:
-        print("[Warning] Using fallback suggestion mechanism.")
-        return self._get_mock_suggestion(user_query)
+        return {
+            "pipeline": pipeline,
+            "reasoning": reasoning,
+            "error": None
+        }
+
+    def _get_fallback_pipeline(self, user_query: str) -> List[Any]:
+        return self._get_mock_suggestion(user_query)["pipeline"]
+
+    def test_connection(self, api_key: str, base_url: str, model: str) -> tuple[bool, str]:
+        """
+        [NEW] 測試 API 連線有效性
+        """
+        if not api_key:
+            return False, "API Key 為空"
+            
+        try:
+            from openai import OpenAI
+            # 使用傳入的參數建立臨時 Client，不影響全域設定
+            # [Fix] Catch potential dependency errors here too
+            try:
+                client = OpenAI(api_key=api_key, base_url=base_url)
+            except TypeError as te:
+                if "proxies" in str(te):
+                    return False, "版本衝突: 請執行 `pip install -U openai httpx`"
+                raise te
+            
+            print(f"[Test] Pinging {base_url} with model {model}...")
+            
+            # 發送極簡請求 (max_tokens=1 節省成本)
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "Hi"}],
+                max_tokens=1
+            )
+            return True, "連線成功"
+            
+        except Exception as e:
+            error_msg = str(e)
+            # 簡化常見錯誤訊息
+            if "401" in error_msg:
+                return False, "認證失敗 (401): 請檢查 API Key"
+            elif "404" in error_msg:
+                return False, f"模型不存在 (404): 請確認 '{model}' 是否支援"
+            elif "Connection" in error_msg:
+                return False, "連線失敗: 請檢查 Base URL"
+            else:
+                return False, f"錯誤: {error_msg}"
+
 
 # ==================== Bridge_Builder 區域 ====================
+# ... (BridgeBuilder remains the same) ...
+
 
 class BridgeBuilder:
     """
@@ -175,50 +317,75 @@ class BridgeBuilder:
         hydrated_pipeline = []
         
         for idx, item in enumerate(skeleton_list):
-            # 正規化輸入：取得名稱與參數覆蓋
+            # 正規化輸入
             if isinstance(item, str):
                 func_name = item
                 param_overrides = {}
+                node_id = f"node_{idx}"
+                inputs = []
             elif isinstance(item, dict):
                 func_name = item.get("function", "Unknown")
                 param_overrides = item.get("params", {})
+                node_id = item.get("id", f"node_{idx}")
+                inputs = item.get("inputs", []) # List of source IDs
             else:
                 continue
 
-            print(f"[Bridge_Builder] Hydrating '{func_name}'...")
+            # Auto-link logic: If inputs is empty and not the first node, link to previous
+            if not inputs and idx > 0:
+                prev_id = hydrated_pipeline[-1]['id']
+                inputs = [prev_id]
+            elif not inputs and idx == 0:
+                inputs = ["source"] # First node takes source image
+
+            print(f"[Bridge] Hydrating '{func_name}' (ID: {node_id}, Inputs: {inputs})...")
             
             # Step 1: 查找演算法
             algo_data = self._lookup_algorithm(func_name)
             
+            node_template = {
+                "id": node_id,
+                "inputs": inputs, # [NEW] Graph Support
+                "name": func_name,
+                "function": func_name,
+                "category": "unknown",
+                "description": "",
+                "fpga_constraints": {},
+                "parameters": {},
+                "source": "unknown"
+            }
+
             if algo_data:
-                # 複製以避免汙染原始資料庫
-                node = {
-                    "id": f"node_{idx}",
+                node_template.update({
                     "name": algo_data['name'],
-                    "function": func_name,
                     "category": algo_data['category'],
                     "description": algo_data['description'],
                     "fpga_constraints": algo_data['fpga_constraints'],
-                    "parameters": algo_data.get('parameters', {}).copy(), # Deep copy structure
+                    "parameters": algo_data.get('parameters', {}).copy(),
                     "opencv_function": algo_data.get('opencv_function', None),
-                    "source": algo_data.get('_library_type', 'official'),
-                    "next_node_id": f"node_{idx + 1}" if idx < len(skeleton_list) - 1 else None
-                }
+                    "source": algo_data.get('_library_type', 'official')
+                })
                 
-                # Step 1.5: 套用 LLM 建議的參數 (Parameter Injection)
+                # Parameter Injection
                 if param_overrides:
-                    print(f"  [AI] Applying suggested parameters: {param_overrides}")
                     for p_key, p_val in param_overrides.items():
-                        if p_key in node['parameters']:
-                            node['parameters'][p_key]['default'] = p_val
-                
-                print(f"  [OK] Found in database ({node['source']})")
+                        if p_key in node_template['parameters']:
+                            node_template['parameters'][p_key]['default'] = p_val
                 
             else:
-                print(f"  [X] Not found in database. Using fallback...")
-                node = self.verilog_guru.create_fallback_node(func_name, idx, len(skeleton_list))
+                # Fallback for merge functions (add, bitwise_and) that might not be in library yet
+                if func_name in ["add", "addWeighted", "bitwise_and", "bitwise_or", "bitwise_xor", "absdiff", "inRange"]:
+                     node_template.update({
+                        "category": "merge_logic",
+                        "description": "Multi-input merge operation",
+                        "fpga_constraints": {"estimated_clk": 100, "resource_usage": "Low", "latency_type": "Pipeline"},
+                        "source": "builtin_merge"
+                     })
+                else:
+                    fallback = self.verilog_guru.create_fallback_node(func_name, idx, len(skeleton_list))
+                    node_template.update(fallback) # Merge fallback props
             
-            hydrated_pipeline.append(node)
+            hydrated_pipeline.append(node_template)
         
         return hydrated_pipeline
     
@@ -258,7 +425,11 @@ class BridgeBuilder:
         func_lower = func_name.lower()
         
         for lib_type in ['official', 'contributed']:
-            for algo_id, algo_data in self.lib_manager.data['libraries'][lib_type].items():
+            # [Fix] Safe access to data structure
+            libs = self.lib_manager.data.get('libraries', {})
+            type_libs = libs.get(lib_type, {})
+            
+            for algo_id, algo_data in type_libs.items():
                 algo_name_lower = algo_data.get('name', '').lower()
                 
                 # 檢查是否包含關鍵字
@@ -413,6 +584,52 @@ class VerilogGuru:
             "_warning": "此節點使用启發式估算，建議人工驗證！"
         }
 
+    def recalculate_pipeline_stats(self, pipeline: List[Dict], width: int, height: int):
+        """
+        [Dynamic FPGA Update] 根據影像解析度重新計算 Estimated CLK
+        
+        Args:
+            pipeline: Pipeline 列表 (將被原地修改)
+            width: 影像寬度
+            height: 影像高度
+        """
+        print(f"[VerilogGuru] Recalculating CLK for resolution {width}x{height}")
+        
+        for node in pipeline:
+            fpga = node.get('fpga_constraints', {})
+            formula = fpga.get('clk_formula')
+            
+            if formula:
+                try:
+                    # 安全評估公式
+                    # 允許的變數: width, height, pixels
+                    allowed_locals = {
+                        "width": width,
+                        "height": height,
+                        "pixels": width * height,
+                        "math": __import__("math")
+                    }
+                    
+                    # 簡單的安全檢查：不允許 __, import, exec 等
+                    if any(bad in formula for bad in ["__", "exec", "eval", "import"]):
+                        print(f"  [WARN] Unsafe formula detected in {node['name']}: {formula}")
+                        continue
+                        
+                    new_clk = eval(formula, {"__builtins__": {}}, allowed_locals)
+                    
+                    # Update
+                    old_clk = fpga.get('estimated_clk', 0)
+                    fpga['estimated_clk'] = int(new_clk)
+                    
+                    print(f"  [{node['name']}] CLK updated: {old_clk} -> {int(new_clk)} (Formula: {formula})")
+                    
+                except Exception as e:
+                    print(f"  [Error] Failed to eval formula for {node['name']}: {e}")
+            else:
+                # 若沒有 formula，且是 Unknown 節點，我們可能需要根據 VerilogGuru 的 heuristic 再次重算?
+                # 目前先保留既有邏輯
+                pass
+
 
 # ==================== 整合介面 ====================
 
@@ -439,25 +656,39 @@ class LogicEngine:
         self.bridge_builder = BridgeBuilder(self.lib_manager)
         self.verilog_guru = VerilogGuru()
     
-    def process_user_query(self, user_query: str, use_mock_llm: bool = False) -> List[Dict]:
+    def process_user_query(self, user_query: str, use_mock_llm: bool = False) -> Dict[str, Any]:
         """
         完整處理使用者需求的主流程
         
-        Args:
-            user_query: 使用者輸入的自然語言需求
-            use_mock_llm: 是否使用 Mock LLM（測試用）
-        
         Returns:
-            List[Dict]: 完整的 Hydrated Pipeline
+            Dict: {
+                "pipeline": List[Dict],
+                "reasoning": str,
+                "error": Optional[str]
+            }
         """
         print(f"\n{'=' * 60}")
         print(f"User Query: '{user_query}'")
         print(f"{'=' * 60}")
         
-        # Step 1: LLM 產生骨架
-        skeleton = self.prompt_master.get_llm_suggestion(user_query, use_mock=use_mock_llm)
-        print(f"\n[Step 1] Skeleton: {skeleton}")
+        # Step 1: LLM 產生骨架 (Now returns dict with reasoning/error)
+        llm_result = self.prompt_master.get_llm_suggestion(user_query, use_mock=use_mock_llm)
         
+        skeleton = llm_result["pipeline"]
+        reasoning = llm_result["reasoning"]
+        error = llm_result["error"]
+        
+        print(f"\n[Step 1] Skeleton: {skeleton}")
+        print(f"[Step 1] Reasoning: {reasoning}")
+        
+        # 如果有錯誤，直接回傳
+        if error:
+            return {
+                "pipeline": [],
+                "reasoning": reasoning,
+                "error": error
+            }
+
         # Step 2: 附加血肉
         pipeline = self.bridge_builder.hydrate_pipeline(skeleton)
         print(f"\n[Step 2] Hydrated {len(pipeline)} nodes")
@@ -465,7 +696,11 @@ class LogicEngine:
         # Step 3: 顯示摘要
         self._print_pipeline_summary(pipeline)
         
-        return pipeline
+        return {
+            "pipeline": pipeline,
+            "reasoning": reasoning,
+            "error": None
+        }
     
     def _print_pipeline_summary(self, pipeline: List[Dict]):
         """

@@ -31,7 +31,23 @@ class LibraryManager:
             lib_path: tech_lib.json 的路徑
         """
         self.lib_path = Path(lib_path)
-        self.data: Dict[str, Any] = {}
+        # 初始化預設結構，防止 load 失敗時後續崩潰
+        self.data: Dict[str, Any] = {
+            "schema_version": "1.0.0",
+            "last_updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+08:00"),
+            "description": "Fallback Library",
+            "libraries": {
+                "official": {},
+                "contributed": {}
+            },
+            "_metadata": {
+                "total_algorithms": 0,
+                "official_count": 0,
+                "contributed_count": 0,
+                "maintainers": [],
+                "license": "Unknown"
+            }
+        }
         self.load()
     
     def load(self) -> bool:
