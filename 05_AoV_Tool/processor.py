@@ -206,6 +206,7 @@ class ImageProcessor:
             self._prev_gray_flow = gray
             return img
         
+        # [Fix] Explicit flow handling for type safety
         flow = cv2.calcOpticalFlowFarneback(self._prev_gray_flow, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
         self._prev_gray_flow = gray
         
@@ -213,8 +214,11 @@ class ImageProcessor:
         hsv = np.zeros((h, w, 3), dtype=np.uint8)
         hsv[..., 1] = 255
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        
+        # [Fix] Normalize properly
         hsv[..., 0] = ang * 180 / np.pi / 2
-        hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+        hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
         return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
     def create_thumbnail(self, image: np.ndarray, max_width: int = 640) -> np.ndarray:
@@ -251,14 +255,17 @@ class ImageProcessor:
         
         if fps <= 0: fps = 30.0
         
-        # Setup Video Writer (mp4v is widely supported in OpenCV)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        # [Fix] Logic Bug: Initialize writer based on PROCESSED frame size, not original size
+        # This allows the pipeline to resize the video (e.g. 1080p -> 480p) correctly.
         
+        out = None
         context = {} # State container for the entire video session
         frame_count = 0
         
-        print(f"\n[Video] Starting processing: {width}x{height} @ {fps}fps")
+        print(f"\n[Video] Input: {width}x{height} @ {fps}fps")
+        
+        # Init output dimensions to avoid unbound local error
+        out_w, out_h = width, height 
         
         try:
             while cap.isOpened():
@@ -270,12 +277,19 @@ class ImageProcessor:
                     break
                     
                 # Execute Pipeline for this frame
-                # Note: We pass 'context' so stateful nodes (like mog2, optical_flow) work correctly
                 processed_frame = self.execute_pipeline(frame, pipeline_json, debug_mode=False, context=context)
                 
-                # Ensure output size matches writer (some pipelines might resize)
-                if processed_frame.shape[1] != width or processed_frame.shape[0] != height:
-                    processed_frame = cv2.resize(processed_frame, (width, height))
+                # Initialize VideoWriter on the first frame
+                if out is None:
+                    out_h, out_w = processed_frame.shape[:2]
+                    print(f"[Video] Output Resolution initialized to: {out_w}x{out_h}")
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    out = cv2.VideoWriter(output_path, fourcc, fps, (out_w, out_h))
+                
+                # Double check dimension consistency (in case dynamic resize changes mid-stream)
+                # If frame size changes mid-stream, we must force it to match the writer
+                if processed_frame.shape[1] != out_w or processed_frame.shape[0] != out_h:
+                    processed_frame = cv2.resize(processed_frame, (out_w, out_h))
                 
                 out.write(processed_frame)
                 frame_count += 1
@@ -285,13 +299,14 @@ class ImageProcessor:
                     
         finally:
             cap.release()
-            out.release()
+            if out is not None:
+                out.release()
             print(f"[Video] Finished. Saved to {output_path}")
             
         return {
             "total_frames": frame_count,
             "fps": fps,
-            "resolution": f"{width}x{height}"
+            "resolution": f"{out_w}x{out_h}" if 'out_w' in locals() else "0x0"
         }
 
     print("Processor loaded.")
