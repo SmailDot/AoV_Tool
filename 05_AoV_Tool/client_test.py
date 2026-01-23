@@ -34,7 +34,8 @@ def main():
         "query": QUERY,
         "image_base64": base64_str,
         "return_base64": True,  # 告訴 Server 我想要把結果圖片也傳回來
-        "use_mock": True        # 測試時用 Mock LLM 省錢，正式用可改 False
+        "use_mock": True,        # 測試時用 Mock LLM 省錢，正式用可改 False
+        "execution_mode": "full" # or 'plan_only'
     }
 
     print(f"2. 發送請求至: {API_URL}")

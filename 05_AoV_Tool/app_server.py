@@ -110,40 +110,46 @@ def process_pipeline():
         input_type = "unknown"
         input_source = "unknown"
         valid_input = False
+        image = None # Init to prevent unbound local error
+        execution_mode = data.get('execution_mode', 'full') # Default to full execution
         
-        if image_path:
-            if not os.path.exists(image_path):
-                return jsonify({"error": f"File path not found: {image_path}"}), 404
-            
-            input_source = image_path
-            file_type = get_file_type(image_path)
-            
-            if file_type == 'image':
-                input_type = 'image'
-                image = cv2.imread(image_path)
-                valid_input = True
-            elif file_type == 'video':
-                input_type = 'video'
-                image = None # Video doesn't load whole file into memory
-                valid_input = True
-            else:
-                return jsonify({"error": "Unsupported file extension"}), 400
-            
-        elif image_base64:
-            # Base64 currently only supports images for simplicity
-            try:
-                image = decode_image(image_base64)
-                input_source = "base64_input"
-                input_type = 'image'
-                valid_input = True
-            except Exception as e:
-                return jsonify({"error": f"Invalid base64 string: {str(e)}"}), 400
-                
+        # If plan_only, we don't need image
+        if execution_mode == 'plan_only':
+            input_type = "none"
+            valid_input = True
         else:
-            return jsonify({"error": "Must provide 'image_path' or 'image_base64'"}), 400
+            if image_path:
+                if not os.path.exists(image_path):
+                    return jsonify({"error": f"File path not found: {image_path}"}), 404
+                
+                input_source = image_path
+                file_type = get_file_type(image_path)
+                
+                if file_type == 'image':
+                    input_type = 'image'
+                    image = cv2.imread(image_path)
+                    valid_input = True
+                elif file_type == 'video':
+                    input_type = 'video'
+                    image = None # Video doesn't load whole file into memory
+                    valid_input = True
+                else:
+                    return jsonify({"error": "Unsupported file extension"}), 400
+                
+            elif image_base64:
+                # Base64 currently only supports images for simplicity
+                try:
+                    image = decode_image(image_base64)
+                    input_source = "base64_input"
+                    input_type = 'image'
+                    valid_input = True
+                except Exception as e:
+                    return jsonify({"error": f"Invalid base64 string: {str(e)}"}), 400
+            else:
+                return jsonify({"error": "Must provide 'image_path' or 'image_base64' (unless execution_mode='plan_only')"}), 400
 
-        # Safety check for image type
-        if input_type == 'image' and image is None:
+        # Safety check for image type (only if executing)
+        if execution_mode != 'plan_only' and input_type == 'image' and image is None:
              return jsonify({"error": "Failed to decode image content"}), 500
 
         # 3. Configure LLM
@@ -152,7 +158,7 @@ def process_pipeline():
             logic_engine.prompt_master.llm_available = True
         
         # 4. Generate Pipeline (Brain)
-        print(f"[Server] Processing Query: {user_query} (Type: {input_type})")
+        print(f"[Server] Processing Query: {user_query} (Mode: {execution_mode})")
         llm_result = logic_engine.process_user_query(user_query, use_mock_llm=use_mock)
         
         if llm_result.get("error"):
@@ -164,37 +170,38 @@ def process_pipeline():
             
         pipeline = llm_result["pipeline"]
         
-        # 5. Execute Pipeline (Muscle)
+        # 5. Execute Pipeline (Muscle) - Skip if plan_only
         timestamp = int(time.time())
         execution_stats = {}
         output_path = "" # Init for scope safety
         result_base64 = None # Init for scope safety
         
-        if input_type == 'image':
-            if image is None: # Double check
-                return jsonify({"error": "Image data lost"}), 500
+        if execution_mode != 'plan_only':
+            if input_type == 'image':
+                if image is None: # Double check (though caught above)
+                    return jsonify({"error": "Image data lost"}), 500
 
-            print(f"[Server] Executing Image Pipeline ({len(pipeline)} nodes)...")
-            processed_image = processor.execute_pipeline(image, pipeline)
-            
-            output_filename = f"result_{timestamp}.png"
-            output_path = os.path.abspath(os.path.join(app.config['OUTPUT_FOLDER'], output_filename))
-            cv2.imwrite(output_path, processed_image)
-            
-            # Base64 output logic (Image only)
-            if data.get('return_base64'):
-                result_base64 = encode_image(processed_image)
+                print(f"[Server] Executing Image Pipeline ({len(pipeline)} nodes)...")
+                processed_image = processor.execute_pipeline(image, pipeline)
                 
-        elif input_type == 'video':
-            print(f"[Server] Executing Video Pipeline ({len(pipeline)} nodes)...")
-            output_filename = f"result_{timestamp}.mp4"
-            output_path = os.path.abspath(os.path.join(app.config['OUTPUT_FOLDER'], output_filename))
-            
-            # Run video processing
-            video_stats = processor.process_video(input_source, output_path, pipeline)
-            execution_stats.update(video_stats)
-            result_base64 = None # Don't return base64 for video (too large)
-
+                output_filename = f"result_{timestamp}.png"
+                output_path = os.path.abspath(os.path.join(app.config['OUTPUT_FOLDER'], output_filename))
+                cv2.imwrite(output_path, processed_image)
+                
+                # Base64 output logic (Image only)
+                if data.get('return_base64'):
+                    result_base64 = encode_image(processed_image)
+                    
+            elif input_type == 'video':
+                print(f"[Server] Executing Video Pipeline ({len(pipeline)} nodes)...")
+                output_filename = f"result_{timestamp}.mp4"
+                output_path = os.path.abspath(os.path.join(app.config['OUTPUT_FOLDER'], output_filename))
+                
+                # Run video processing
+                video_stats = processor.process_video(input_source, output_path, pipeline)
+                execution_stats.update(video_stats)
+                result_base64 = None # Don't return base64 for video (too large)
+        
         # 6. Generate Code
         generated_python_code = CodeGenerator.generate_python_script(pipeline)
 
@@ -206,6 +213,7 @@ def process_pipeline():
             "query": user_query,
             "reasoning": llm_result.get("reasoning"),
             "pipeline_summary": [n['name'] for n in pipeline],
+            "pipeline_json": pipeline, # [NEW] Return full pipeline JSON
             "input_source": input_source,
             "output_path": output_path,
             "output_base64": result_base64,
