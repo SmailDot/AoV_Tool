@@ -66,13 +66,23 @@ def health_check():
         "version": "1.0"
     })
 
-@app.route('/process', methods=['POST'])
+@app.route('/process', methods=['GET', 'POST'])
 def process_pipeline():
     """
     Main processing endpoint for n8n.
     Accepts: JSON with 'query' and ('image_path' OR 'image_base64')
     Returns: JSON with result path and metadata
     """
+    if request.method == 'GET':
+        return jsonify({
+            "status": "error",
+            "message": "Method Not Allowed for GET. Please use POST request with JSON body.",
+            "example_body": {
+                "query": "Detect coins",
+                "image_path": "C:/path/to/image.jpg"
+            }
+        }), 405
+
     try:
         start_time = time.time()
         data = request.json
