@@ -224,27 +224,86 @@ class PromptMaster:
     
     def _get_mock_suggestion(self, user_query: str) -> Dict[str, Any]:
         """
-        Mock LLM 建議
+        Mock LLM 建議 - 提供詳細的 JSON 分析報告
         """
         query_lower = user_query.lower()
         pipeline = []
-        reasoning = "這是 Mock 模式 (無網路/無 Key) 的預設建議。"
+        reasoning = ""
         
         if "coin" in query_lower or "硬幣" in query_lower:
-            pipeline = [{"function": "advanced_coin_detection"}]
-            reasoning = "[Mock] 偵測到關鍵字 '硬幣'。系統推薦使用 Advanced Coin Detector，這是一個針對圓形物體優化的複合演算法。"
+            pipeline = [
+                {
+                    "function": "resize", 
+                    "params": {"width": 640},
+                    "reason": "縮小圖片以提升處理速度與減少噪點影響"
+                },
+                {
+                    "function": "gaussian_blur", 
+                    "params": {"ksize": [9, 9], "sigmaX": 2},
+                    "reason": "使用較大的核心 (9x9) 強力去除鍵盤紋理與背景雜訊"
+                },
+                {
+                    "function": "hough_circles", 
+                    "params": {"dp": 1.2, "minDist": 30, "param1": 50, "param2": 30, "minRadius": 20, "maxRadius": 80},
+                    "reason": "使用霍夫圓變換偵測圓形物體，參數已針對一般硬幣大小優化"
+                }
+            ]
+            reasoning = (
+                "**[Mock 分析報告]**\n"
+                "1. **需求理解**: 使用者希望偵測硬幣，通常背景可能會有雜訊 (如鍵盤、桌紋)。\n"
+                "2. **預處理策略**: 為了避免誤判，我們首先將影像 Resize 至 640px 寬度，這能有效標準化硬幣的像素大小。接著使用強度較高的 GaussianBlur (9x9) 來抹除硬幣上的刻痕與背景紋理。\n"
+                "3. **核心演算法**: 選擇 HoughCircles，這是經典且對遮擋具有一定魯棒性的圓形偵測演算法。\n"
+                "4. **參數建議**: 設定 minRadius=20, maxRadius=80 以過濾掉過小(噪點)或過大(杯子)的圓形。"
+            )
             
         elif "edge" in query_lower or "邊緣" in query_lower:
-            pipeline = ["GaussianBlur", "Canny"]
-            reasoning = "[Mock] 偵測到關鍵字 '邊緣'。推薦標準流程：先使用高斯模糊 (GaussianBlur) 降噪，再使用 Canny 算子抓取邊緣。"
+            pipeline = [
+                {
+                    "function": "gaussian_blur",
+                    "params": {"ksize": [5, 5]},
+                    "reason": "初步降噪，避免 Canny 偵測到過多假邊緣"
+                },
+                {
+                    "function": "canny_edge",
+                    "params": {"threshold1": 50, "threshold2": 150},
+                    "reason": "使用 Canny 演算法，雙閾值設定 (50, 150) 以保留顯著邊緣"
+                }
+            ]
+            reasoning = (
+                "**[Mock 分析報告]**\n"
+                "1. **需求理解**: 使用者需要提取影像中的邊緣特徵。\n"
+                "2. **策略**: 邊緣偵測對噪點非常敏感，因此必須先進行平滑處理。\n"
+                "3. **流程**: GaussianBlur (5x5) -> Canny Edge Detector。\n"
+                "4. **參數**: Canny 的高低閾值比例設為 3:1 (150/50)，這是 OpenCV 官方推薦的經驗值。"
+            )
             
         elif "denoise" in query_lower or "降噪" in query_lower:
-            pipeline = [{"function": "GaussianBlur"}, {"function": "Morphological_Open"}]
-            reasoning = "[Mock] 偵測到關鍵字 '降噪'。推薦使用高斯模糊搭配形態學開運算 (Opening) 來去除背景雜訊。"
+            pipeline = [
+                {
+                    "function": "bilateral_filter",
+                    "params": {"d": 9, "sigmaColor": 75, "sigmaSpace": 75},
+                    "reason": "使用雙邊濾波器，能在去除噪點的同時保留邊緣細節 (Edge-Preserving)"
+                }
+            ]
+            reasoning = (
+                "**[Mock 分析報告]**\n"
+                "1. **需求理解**: 目標是去除噪點但不想讓畫面變模糊。\n"
+                "2. **演算法選擇**: 放棄普通的高斯模糊，改用計算量較大但效果更好的 Bilateral Filter。\n"
+                "3. **參數**: sigmaColor=75 允許較大的色彩差異混合，適合處理色彩噪聲。"
+            )
             
         else:
-            pipeline = ["GaussianBlur", "Canny"]
-            reasoning = "[Mock] 未偵測到特定關鍵字。系統預設提供邊緣檢測流程供您參考。"
+            # Default Fallback
+            pipeline = [
+                {"function": "resize", "params": {"width": 480}},
+                {"function": "gaussian_blur", "params": {"ksize": [3, 3]}},
+                {"function": "canny_edge", "params": {"threshold1": 30, "threshold2": 100}}
+            ]
+            reasoning = (
+                "**[Mock 分析報告]**\n"
+                "1. **狀況**: 未偵測到特定關鍵字，系統提供一組通用的預處理與特徵提取流程。\n"
+                "2. **建議**: 若您有特定目標 (如：人臉、車牌、顏色)，請在查詢中明確描述。"
+            )
 
         return {
             "pipeline": pipeline,
