@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 # Import Core Components
 from logic_engine import LogicEngine
 from processor import ImageProcessor
+from code_generator import CodeGenerator
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -194,6 +195,9 @@ def process_pipeline():
             execution_stats.update(video_stats)
             result_base64 = None # Don't return base64 for video (too large)
 
+        # 6. Generate Code
+        generated_python_code = CodeGenerator.generate_python_script(pipeline)
+
         execution_time = time.time() - start_time
         
         return jsonify({
@@ -207,7 +211,8 @@ def process_pipeline():
             "output_base64": result_base64,
             "execution_time_sec": round(execution_time, 2),
             "video_stats": execution_stats if input_type == 'video' else None,
-            "fpga_estimated_clk": sum(n['fpga_constraints']['estimated_clk'] for n in pipeline)
+            "fpga_estimated_clk": sum(n['fpga_constraints']['estimated_clk'] for n in pipeline),
+            "generated_code": generated_python_code
         })
 
     except Exception as e:

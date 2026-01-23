@@ -28,6 +28,7 @@
     "output_path": "D:\\...\\outputs\\result_17000000.png",
     "fpga_estimated_clk": 15000,
     "pipeline_summary": ["GaussianBlur", "Canny"],
-    "reasoning": "使用 Canny 演算法進行邊緣偵測..."
+    "reasoning": "使用 Canny 演算法進行邊緣偵測...",
+    "generated_code": "import cv2\nimport numpy as np..."
   }
 }

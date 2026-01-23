@@ -42,7 +42,8 @@ Use `n8n_adapter.py` for direct command-line integration. This is suitable when 
     "total_frames": 300,
     "fps": 30.0,
     "resolution": "640x480"
-  }
+  },
+  "generated_code": "import cv2\n..."
 }
 ```
 
