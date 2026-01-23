@@ -67,29 +67,54 @@ with col_left:
     with st.container():
         st.caption("1. 上傳影像")
         uploaded_file = st.file_uploader(
-            "選擇影像檔案",
-            type=['jpg', 'jpeg', 'png', 'bmp'],
+            "選擇影像/影片檔案",
+            type=['jpg', 'jpeg', 'png', 'bmp', 'mp4', 'avi', 'mov'],
             label_visibility="collapsed"
         )
 
     
     if uploaded_file is not None:
-        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-        img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        file_type = uploaded_file.name.split('.')[-1].lower()
         
-        if img_bgr is None:
-            st.error("無法解碼影像，請確認檔案格式是否正確。")
-        else:
-            st.session_state.uploaded_image = img_bgr
+        if file_type in ['mp4', 'avi', 'mov']:
+            # Video Handling
+            st.session_state.is_video = True
+            st.session_state.video_path = f"temp_input.{file_type}"
+            with open(st.session_state.video_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
             
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-            st.image(img_rgb, caption="原始影像")
+            st.video(st.session_state.video_path)
+            st.info(f"已載入影片: {uploaded_file.name}")
+            
+            # Use first frame for preview/FPGA calculation
+            cap = cv2.VideoCapture(st.session_state.video_path)
+            ret, first_frame = cap.read()
+            if ret:
+                st.session_state.uploaded_image = first_frame # Keep for preview context
+                h, w = first_frame.shape[:2]
+                if st.session_state.pipeline:
+                    engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+            cap.release()
+            
+        else:
+            # Image Handling (Existing Logic)
+            st.session_state.is_video = False
+            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+            img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            
+            if img_bgr is None:
+                st.error("無法解碼影像，請確認檔案格式是否正確。")
+            else:
+                st.session_state.uploaded_image = img_bgr
+                
+                img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+                st.image(img_rgb, caption="原始影像")
 
-            # [NEW] Dynamic FPGA Estimation
-            if st.session_state.pipeline:
-                h, w = img_bgr.shape[:2]
-                engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                st.toast(f"FPGA 資源已根據解析度 ({w}x{h}) 更新", icon="⚡")
+                # [NEW] Dynamic FPGA Estimation
+                if st.session_state.pipeline:
+                    h, w = img_bgr.shape[:2]
+                    engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                    st.toast(f"FPGA 資源已根據解析度 ({w}x{h}) 更新", icon="⚡")
     
     st.divider()
     
@@ -408,17 +433,31 @@ with col_left:
     
     st.divider()
     
-    if st.session_state.pipeline and st.session_state.uploaded_image is not None:
+    if st.session_state.pipeline and (st.session_state.uploaded_image is not None or st.session_state.get('is_video')):
         if st.button("Run Pipeline", type="primary", use_container_width=True):
             with st.spinner("Processing..."):
                 try:
                     active_pipeline = [n for n in st.session_state.pipeline if n.get('_enabled', True)]
-                    result = processor.execute_pipeline(
-                        st.session_state.uploaded_image,
-                        active_pipeline
-                    )
-                    st.session_state.processed_image = result
-                    st.success("Complete")
+                    
+                    if st.session_state.get('is_video'):
+                        # Video Execution
+                        output_path = "temp_output.mp4"
+                        stats = processor.process_video(
+                            st.session_state.video_path,
+                            output_path,
+                            active_pipeline
+                        )
+                        st.session_state.processed_video_path = output_path
+                        st.success(f"Video Complete: {stats['resolution']} @ {stats['fps']}fps")
+                    else:
+                        # Image Execution
+                        result = processor.execute_pipeline(
+                            st.session_state.uploaded_image,
+                            active_pipeline
+                        )
+                        st.session_state.processed_image = result
+                        st.success("Complete")
+                        
                 except Exception as e:
                     st.error(f"Failed: {e}")
 
@@ -433,7 +472,15 @@ with col_right:
     st.divider()
     
     st.subheader("處理結果")
-    if st.session_state.processed_image is not None:
+    
+    # Video Result Display
+    if st.session_state.get('is_video') and st.session_state.get('processed_video_path'):
+        st.video(st.session_state.processed_video_path)
+        with open(st.session_state.processed_video_path, "rb") as f:
+            st.download_button("下載影片", f, "result.mp4", "video/mp4", use_container_width=True)
+            
+    # Image Result Display
+    elif st.session_state.processed_image is not None:
         zoom_level = st.slider("縮放", 25, 200, 100, 25, format="%d%%")
         result_rgb = cv2.cvtColor(st.session_state.processed_image, cv2.COLOR_BGR2RGB)
         
