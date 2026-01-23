@@ -740,7 +740,10 @@ if __name__ == "__main__":
     )
     
     # 導出 JSON
-    engine.bridge_builder.export_to_json(pipeline1, "test_pipeline_coins.json")
+    if pipeline1.get("pipeline"):
+        engine.bridge_builder.export_to_json(pipeline1["pipeline"], "test_pipeline_coins.json")
+    else:
+        print("[Test] Skipping export due to error in pipeline generation")
     
     # 測試案例 2: 邊緣偵測
     print("\n[Test Case 2] Edge Detection")
