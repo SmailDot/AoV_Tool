@@ -85,20 +85,13 @@ def render_pipeline_graph(pipeline):
                 net.add_edge(current_id, next_id, label=clk_label, color='#1976D2', arrows='to',
                             font={'size': 12, 'face': 'Microsoft JhengHei'})
             
-            # Generate and display using temp file to avoid permission/path issues
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".html", mode='w+', encoding='utf-8') as tmp:
-                net.save_graph(tmp.name)
-                tmp.seek(0)
-                html_content = tmp.read()
+            # Generate HTML directly using utf-8 handling
+            # Note: generate_html() returns the HTML string. 
+            # We don't use save_graph() because it defaults to system encoding (cp950 on Windows) which fails with special chars.
+            html_content = net.generate_html()
                 
             components.html(html_content, height=620, scrolling=False)
             
-            # Clean up (Optional, but good practice if OS doesn't clean temp immediately)
-            try:
-                os.remove(tmp.name)
-            except:
-                pass
-                
             total_clk = sum(n['fpga_constraints'].get('estimated_clk', 0) for n in pipeline)
             st.metric("總時脈", f"{total_clk} clk")
             

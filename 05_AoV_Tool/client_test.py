@@ -7,7 +7,7 @@ import time
 
 # ================= 設定區 =================
 # 請填入您的 Server 網址 (本地測試用 localhost，遠端用 ngrok)
-API_URL = "http://localhost:5000/process" 
+API_URL = "https://a71791de49ef.ngrok-free.app/" 
 # API_URL = "https://xxxx.ngrok-free.app/process" 
 
 # 測試用的檔案 (圖片或影片) - 僅在 execution_mode='full' 時需要

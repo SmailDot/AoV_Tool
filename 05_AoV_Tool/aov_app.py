@@ -22,10 +22,12 @@ from components.sidebar import render_sidebar
 from components.visualizer import render_pipeline_graph
 from components.style import apply_custom_style, render_hero_section
 
-# [NEW] Import AutoTuner and Canvas
-from streamlit_drawable_canvas import st_canvas
+# [NEW] Import AutoTuner
 from app.vision.optimizer import AutoTuner
 from PIL import Image
+import numpy as np
+import cv2
+import time
 
 # ==================== Main App ====================
 
@@ -114,54 +116,102 @@ with col_left:
                 
                 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 
-                # ================= Auto-Tune Canvas =================
+                # ================= Auto-Tune (File Upload Mode) =================
                 enable_tuning = st.checkbox("🎯 啟用目標驅動優化 (Auto-Tune)", value=False)
                 
                 if enable_tuning:
-                    st.info("請在下方畫出您預期的目標區域 (Ground Truth)。系統將自動調整參數以匹配您的標註。")
+                    st.info("請上傳一張與原圖大小相同的「目標遮罩 (Ground Truth Mask)」。\n(黑白圖片，白色代表目標區域)")
                     
-                    # Convert for Canvas
-                    pil_image = Image.fromarray(img_rgb)
+                    mask_file = st.file_uploader("上傳遮罩圖片", type=['png', 'jpg', 'bmp'], key="mask_uploader")
                     
-                    # Canvas Settings
-                    stroke_width = st.slider("畫筆粗細", 1, 50, 20)
-                    drawing_mode = st.selectbox("繪圖模式", ("freedraw", "rect", "circle"), index=0)
-                    
-                    canvas_result = st_canvas(
-                        fill_color="rgba(255, 255, 255, 1.0)",  # White fill
-                        stroke_color="rgba(255, 255, 255, 1.0)", # White stroke
-                        background_image=pil_image,
-                        update_streamlit=True,
-                        height=pil_image.height if pil_image.height < 600 else 600,
-                        width=pil_image.width if pil_image.width < 800 else 800,
-                        drawing_mode=drawing_mode,
-                        stroke_width=stroke_width,
-                        key="canvas",
-                    )
-                    
-                    if canvas_result.image_data is not None and st.session_state.pipeline:
-                        if st.button("🚀 開始自動優化 (Auto-Tune)", type="primary"):
-                            with st.spinner("正在瘋狂嘗試參數組合，請稍候..."):
-                                # Prepare Mask (Extract Alpha channel or just convert to Gray)
-                                # canvas_result.image_data is RGBA
-                                mask_rgba = canvas_result.image_data
-                                mask_gray = cv2.cvtColor(mask_rgba.astype(np.uint8), cv2.COLOR_RGBA2GRAY)
-                                _, mask_bin = cv2.threshold(mask_gray, 10, 255, cv2.THRESH_BINARY)
-                                
-                                # Run Optimizer
-                                tuner = AutoTuner()
-                                best_pipeline, best_score = tuner.tune_pipeline(
-                                    img_bgr,
-                                    mask_bin,
-                                    st.session_state.pipeline,
-                                    max_iterations=50, # Quick tuning
-                                    time_limit=15
-                                )
-                                
-                                # Update Session
-                                st.session_state.pipeline = best_pipeline
-                                st.success(f"優化完成！IoU 分數提升至: {best_score:.4f}")
-                                st.rerun()
+                    col_preview1, col_preview2 = st.columns(2)
+                    with col_preview1:
+                        st.image(img_rgb, caption="原始影像")
+                        
+                    if mask_file is not None:
+                        # Load Mask
+                        mask_bytes = np.asarray(bytearray(mask_file.read()), dtype=np.uint8)
+                        mask_raw = cv2.imdecode(mask_bytes, cv2.IMREAD_GRAYSCALE)
+                        
+                        if mask_raw is not None:
+                            # Binarize and Resize if needed
+                            _, mask_bin = cv2.threshold(mask_raw, 127, 255, cv2.THRESH_BINARY)
+                            
+                            # Auto-resize mask to match source if needed
+                            if mask_bin.shape != img_bgr.shape[:2]:
+                                st.warning(f"遮罩尺寸 ({mask_bin.shape[::-1]}) 與原圖 ({img_bgr.shape[1]}x{img_bgr.shape[0]}) 不符，將自動縮放。")
+                                mask_bin = cv2.resize(mask_bin, (img_bgr.shape[1], img_bgr.shape[0]), interpolation=cv2.INTER_NEAREST)
+                            
+                            with col_preview2:
+                                st.image(mask_bin, caption="目標遮罩 (Target)", clamp=True)
+                            
+                            if st.session_state.pipeline:
+                                if st.button("🚀 開始自動優化 (Auto-Tune)", type="primary"):
+                                    # Save original pipeline for comparison
+                                    original_pipeline = [n.copy() for n in st.session_state.pipeline]
+                                    
+                                    progress_bar = st.progress(0)
+                                    status_text = st.empty()
+                                    
+                                    with st.spinner("正在執行爬山演算法優化參數，請稍候..."):
+                                        # Run Optimizer
+                                        tuner = AutoTuner()
+                                        status_text.text("初始化優化引擎...")
+                                        
+                                        # Capture intermediate updates? 
+                                        # Currently AutoTuner is blocking. We can modify it to yield, but for now let's just run it.
+                                        best_pipeline, best_score = tuner.tune_pipeline(
+                                            img_bgr,
+                                            mask_bin,
+                                            st.session_state.pipeline,
+                                            max_iterations=50, 
+                                            time_limit=15
+                                        )
+                                        
+                                        progress_bar.progress(100)
+                                        status_text.text("優化完成！")
+                                        
+                                        # Update Session
+                                        st.session_state.pipeline = best_pipeline
+                                        
+                                        # Force Re-execution for Preview
+                                        try:
+                                            result = processor.execute_pipeline(st.session_state.uploaded_image, best_pipeline)
+                                            st.session_state.processed_image = result
+                                        except:
+                                            pass
+                                        
+                                        st.success(f"優化完成！IoU 分數提升至: {best_score:.4f}")
+                                        
+                                        # Show Diff
+                                        with st.expander("參數變更報告", expanded=True):
+                                            for i, node in enumerate(best_pipeline):
+                                                old_node = original_pipeline[i]
+                                                node_name = node['name']
+                                                changed = False
+                                                diff_msg = []
+                                                
+                                                for param_key, param_info in node.get('parameters', {}).items():
+                                                    new_val = param_info['default']
+                                                    old_val = old_node['parameters'][param_key]['default']
+                                                    
+                                                    # Simple equality check
+                                                    if new_val != old_val:
+                                                        changed = True
+                                                        diff_msg.append(f"{param_key}: {old_val} -> {new_val}")
+                                                
+                                                if changed:
+                                                    st.markdown(f"**{node_name}**: " + ", ".join(diff_msg))
+                                                else:
+                                                    st.caption(f"{node_name}: 無變更")
+                                        
+                                        st.balloons()
+                                        time.sleep(1) # Let user see the balloons
+                                        st.rerun()
+                            else:
+                                st.warning("請先在左側生成 Pipeline 才能進行優化。")
+                        else:
+                            st.error("無法讀取遮罩圖片。")
                 else:
                     st.image(img_rgb, caption="原始影像")
 

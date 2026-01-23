@@ -6,75 +6,79 @@
 ## 1. 專案靈魂 (Project Identity)
 *   **名稱**: NKUST AoV Tool (Algorithm on Vision / FPGA)
 *   **定位**: 電腦視覺演算法的「快速原型設計」與「FPGA 資源估算」工具。
-*   **核心價值**: 讓不懂 OpenCV 的人能用自然語言設計 Pipeline，並讓不懂 FPGA 的人知道這個演算法會消耗多少資源。
+*   **核心價值**: 
+    1.  **Low-Code/No-Code**: 讓不懂 OpenCV 的人能用自然語言設計 Pipeline。
+    2.  **Hardware-Aware**: 即時估算演算法在 FPGA 上的資源消耗 (DSP/LUT/BRAM)。
+    3.  **Self-Optimizing**: 具備目標驅動 (Target-Driven) 的自動調參能力。
 *   **主要開發者**: Sisyphus (你我他)。
 
 ## 2. 架構地圖 (Architecture Map)
 
-專案採用 **Streamlit (UI) + OpenCV (Engine) + LLM (Brain)** 的三層架構。
+專案採用 **Streamlit (UI) + Flask (API) + OpenCV (Engine) + LLM (Brain)** 的混合架構。
 
 ```
 05_AoV_Tool/
-├── aov_app.py              # [UI] 入口點。只負責 Layout 與 Session State 管理。
-├── logic_engine.py         # [Brain] LLM 通訊 (OpenAI/Google)、Prompt 工程、DAG 解析。
-├── processor.py            # [Muscle] 執行引擎。負責調度演算法，本身不含邏輯。
-├── library_manager.py      # [Data] 讀寫 tech_lib.json，負責演算法的 CRUD。
-├── tech_lib.json           # [DB] 演算法的規格書、參數定義、FPGA 資源表。
+├── aov_app.py              # [UI] Streamlit 入口。負責人機互動、畫布標註、Session State。
+├── app_server.py           # [API] Flask Server。負責 n8n 自動化串接 (無頭模式)。
+├── logic_engine.py         # [Brain] LLM 通訊、Prompt 工程、Mock 邏輯。
+├── processor.py            # [Muscle] 執行引擎。負責影像/影片的 I/O 與調度。
+├── library_manager.py      # [Data] 讀寫 tech_lib.json。
+├── auto_tuner.py           # [Solver] (Legacy) 已被 app/vision/optimizer 取代。
 │
-├── app/vision/ops/         # [Kernels] 真正的 OpenCV 實作放在這裡！
-│   ├── basic.py            # 模糊、縮放
-│   ├── edge.py             # Canny, Sobel
-│   ├── detect.py           # Hough, HOG, Advanced Coin
-│   ├── merge.py            # Add, Blend (多輸入支援)
-│   └── custom/             # 未來擴充用目錄
+├── app/vision/             # [Core Logic]
+│   ├── ops/                # [Kernels] 真正的 OpenCV 實作 (basic, edge, detect...)
+│   └── optimizer/          # [Optimizer] 自動調參引擎 (Hill Climbing, Evaluator)
 │
-└── components/             # [UI Components] 側邊欄、節點編輯器、視覺化圖表。
+├── components/             # [UI Components] 側邊欄、視覺化圖表、PyVis 流程圖。
+└── tech_lib.json           # [DB] 演算法規格書、參數定義、FPGA 資源表。
 ```
 
 ## 3. 關鍵機制 (Critical Mechanisms)
 
-### 3.1. 雙通道 LLM (Dual-Core LLM)
-*   **邏輯**: `LogicEngine` 會檢查 Base URL。
-*   **OpenAI 通道**: 用於 OpenAI, Groq, DeepSeek。使用 `openai` 套件。
-*   **Google 原生通道**: 用於 Gemini。**必須**使用 `google.generativeai` 套件，避開相容層的 404 Bug。
+### 3.1. 雙模式運作 (Dual-Mode Operation)
+*   **UI Mode (`run_tool.py`)**: 提供完整的人機介面，支援互動式畫布與即時預覽。
+*   **API Mode (`app_server.py`)**: 提供 REST API (`POST /process`)，專供 **n8n** 或其他自動化工具呼叫。支援 `plan_only` (秒回 JSON) 與 `full` (完整運算) 模式。
 
-### 3.2. 有狀態執行 (Stateful Execution)
-*   **問題**: 靜態圖片 vs 動態影片。
-*   **解法**: `processor.execute_pipeline(..., context={})`。
-*   **實作**: 演算法 (如 `op_advanced_coin_logic`) 會檢查 `context`。
-    *   若 `context` 為空 -> 單張圖模式 (Instant)。
-    *   若 `context` 有值 -> 影片模式 (Accumulate)。
+### 3.2. 目標驅動優化 (Target-Driven Optimization)
+*   **核心**: `app.vision.optimizer.AutoTuner`。
+*   **邏輯**: 使用 **Hill Climbing** 演算法，自動調整 Pipeline 參數，使運算結果與使用者提供的 **Ground Truth Mask** (黑白遮罩) 達到最大 **IoU**。
+*   **流程**: 
+    1. LLM 產生骨架 (Pipeline Structure)。
+    2. 使用者上傳 Mask。
+    3. AutoTuner 瘋狂微調參數 (Parameter Fine-tuning)。
 
-### 3.3. 模組化 Ops (Refactored Ops)
-*   不要把邏輯寫在 `processor.py`！
-*   去 `app/vision/ops` 找對應的分類檔案。
-*   寫完後，記得去 `processor.py` 的 `operation_map` 註冊。
+### 3.3. 影片支援 (Video Support)
+*   **處理器**: `processor.process_video()`。
+*   **邏輯**: 逐幀處理，並維護 `context` 狀態以支援時序演算法 (如 Optical Flow, Background Subtraction)。
+*   **解析度**: 輸出影片會自動適應 Pipeline 的最終尺寸 (例如經過 Resize 後)。
 
-### 3.4. 繁體中文優先
-*   `PromptMaster` 被強制要求使用 **Traditional Chinese (Taiwan)** 進行 Reasoning。
-*   `tech_lib.json` 的 `name_zh` 欄位用於 UI 顯示。
+### 3.4. 雙通道 LLM (Dual-Core LLM)
+*   **OpenAI 通道**: 標準 API。
+*   **Google 原生通道**: 使用 `google.generativeai` SDK，避開相容層 Bug。
+*   **Mock 模式**: 強大的 Mock 邏輯，能回傳詳細的 JSON 分析報告，即使沒聯網也能展示功能。
 
 ## 4. 常見坑點 (Known Issues & Fixes)
 
 | 症狀 | 原因 | 解法 |
 |------|------|------|
-| **Sidebar 消失** | `tech_lib.json` 格式壞了，導致 `LibraryManager` 載入失敗。 | 檢查 JSON 結尾是否有多餘逗號。程式已有 Fallback 機制。 |
-| **Model Not Found (404)** | Google Gemini 的 OpenAI 相容層掛了，或是模型改名了。 | 切換到 Google 原生通道 (已自動化)。使用 `gemini-2.0-flash-exp`。 |
-| **Proxy Error** | `openai` 與 `httpx` 版本衝突。 | `pip install -U openai httpx`。 |
-| **Unknown Operation** | 新增了 Op 但忘記在 `processor.py` 註冊。 | 去 `processor.py` 的 `__init__` 補上。 |
+| **st_canvas 報錯** | Streamlit 1.52+ 移除了 `image_to_url` API。 | `aov_app.py` 中有 Monkey Patch 修復此問題；或者改用「遮罩上傳模式」。 |
+| **PyVis 流程圖空白** | Windows 編碼 (CP950) 導致 HTML 生成失敗。 | `visualizer.py` 改用 `generate_html()` 與 `components.html` 直接渲染字串。 |
+| **n8n 連不上** | `localhost` 指向錯誤或沒有 HTTPS。 | 使用 `expose_server.py` (ngrok) 建立外部隧道。 |
+| **影片解析度跑掉** | `VideoWriter` 初始化太早。 | `processor.py` 改為「Lazy Init」，等第一幀處理完確定尺寸後再初始化 Writer。 |
 
 ## 5. 未來擴充指南 (Future Roadmap)
 
 如果你要...
 1.  **新增演算法**:
-    *   寫在 `app/vision/ops/custom/my_algo.py`。
-    *   在 `tech_lib.json` 加入 Metadata。
-    *   在 `processor.py` 註冊。
-2.  **支援影片上傳**:
-    *   在 `aov_app.py` 新增 `st.video_uploader`。
-    *   撰寫一個迴圈，重複呼叫 `processor.execute_pipeline(frame, context=state)`。
-3.  **優化 Prompt**:
-    *   修改 `logic_engine.py` 中的 `SYSTEM_PROMPT`。
+    *   在 `app/vision/ops/` 實作函式。
+    *   在 `tech_lib.json` 定義參數與 FPGA 消耗。
+    *   在 `processor.py` 的 `operation_map` 註冊。
+    *   在 `app/vision/optimizer/params.py` 定義參數調整範圍。
+2.  **優化 AutoTuner**:
+    *   在 `app/vision/optimizer/strategy.py` 實作新的策略 (如 Genetic Algorithm)。
+    *   在 `app/vision/optimizer/evaluator.py` 加入新的評分指標 (如 Edge Continuity)。
+3.  **整合 n8n**:
+    *   參考 `n8n_context_bundle.md` 與 `example_payload.json`。
 
 ---
-*Generated by Sisyphus (2026-01-20)*
+*Generated by Sisyphus (2026-01-24)*
