@@ -44,6 +44,20 @@ def encode_image(image_bgr):
     _, buffer = cv2.imencode('.png', image_bgr)
     return base64.b64encode(buffer).decode('utf-8')
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint for sanity checks"""
+    return jsonify({
+        "status": "running",
+        "service": "NKUST AoV Tool API",
+        "endpoints": {
+            "health": "GET /health",
+            "process": "POST /process",
+            "algorithms": "GET /algorithms"
+        },
+        "message": "Use /process endpoint for n8n integration."
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
