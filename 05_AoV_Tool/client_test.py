@@ -51,6 +51,17 @@ def main():
             print(f"   - 流程: {result.get('pipeline_summary')}")
             print(f"   - FPGA: {result.get('fpga_estimated_clk')} clk")
             
+            if result.get('generated_code'):
+                print(f"   - 程式碼生成: ✅ (長度: {len(result['generated_code'])} chars)")
+                # Print first 3 lines preview
+                code_preview = "\n".join(result['generated_code'].split('\n')[:3])
+                print(f"     預覽:\n{code_preview}...")
+            
+            # Save full JSON response for inspection
+            with open("response_debug.json", "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            print(f"   - 完整回應已存為: response_debug.json")
+
             # 處理回傳的檔案
             if result.get('output_base64'):
                 output_filename = f"output_{int(time.time())}.png"
