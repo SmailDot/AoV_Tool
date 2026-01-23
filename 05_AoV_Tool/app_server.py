@@ -113,11 +113,12 @@ def process_pipeline():
         image = None # Init to prevent unbound local error
         execution_mode = data.get('execution_mode', 'full') # Default to full execution
         
-        # If plan_only, we don't need image
+        # If plan_only, we SKIP file validation entirely
         if execution_mode == 'plan_only':
             input_type = "none"
             valid_input = True
         else:
+            # Only validate files in 'full' mode
             if image_path:
                 if not os.path.exists(image_path):
                     return jsonify({"error": f"File path not found: {image_path}"}), 404
