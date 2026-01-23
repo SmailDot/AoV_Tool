@@ -22,6 +22,11 @@ from components.sidebar import render_sidebar
 from components.visualizer import render_pipeline_graph
 from components.style import apply_custom_style, render_hero_section
 
+# [NEW] Import AutoTuner and Canvas
+from streamlit_drawable_canvas import st_canvas
+from app.vision.optimizer import AutoTuner
+from PIL import Image
+
 # ==================== Main App ====================
 
 st.set_page_config(
@@ -108,7 +113,57 @@ with col_left:
                 st.session_state.uploaded_image = img_bgr
                 
                 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-                st.image(img_rgb, caption="原始影像")
+                
+                # ================= Auto-Tune Canvas =================
+                enable_tuning = st.checkbox("🎯 啟用目標驅動優化 (Auto-Tune)", value=False)
+                
+                if enable_tuning:
+                    st.info("請在下方畫出您預期的目標區域 (Ground Truth)。系統將自動調整參數以匹配您的標註。")
+                    
+                    # Convert for Canvas
+                    pil_image = Image.fromarray(img_rgb)
+                    
+                    # Canvas Settings
+                    stroke_width = st.slider("畫筆粗細", 1, 50, 20)
+                    drawing_mode = st.selectbox("繪圖模式", ("freedraw", "rect", "circle"), index=0)
+                    
+                    canvas_result = st_canvas(
+                        fill_color="rgba(255, 255, 255, 1.0)",  # White fill
+                        stroke_color="rgba(255, 255, 255, 1.0)", # White stroke
+                        background_image=pil_image,
+                        update_streamlit=True,
+                        height=pil_image.height if pil_image.height < 600 else 600,
+                        width=pil_image.width if pil_image.width < 800 else 800,
+                        drawing_mode=drawing_mode,
+                        stroke_width=stroke_width,
+                        key="canvas",
+                    )
+                    
+                    if canvas_result.image_data is not None and st.session_state.pipeline:
+                        if st.button("🚀 開始自動優化 (Auto-Tune)", type="primary"):
+                            with st.spinner("正在瘋狂嘗試參數組合，請稍候..."):
+                                # Prepare Mask (Extract Alpha channel or just convert to Gray)
+                                # canvas_result.image_data is RGBA
+                                mask_rgba = canvas_result.image_data
+                                mask_gray = cv2.cvtColor(mask_rgba.astype(np.uint8), cv2.COLOR_RGBA2GRAY)
+                                _, mask_bin = cv2.threshold(mask_gray, 10, 255, cv2.THRESH_BINARY)
+                                
+                                # Run Optimizer
+                                tuner = AutoTuner()
+                                best_pipeline, best_score = tuner.tune_pipeline(
+                                    img_bgr,
+                                    mask_bin,
+                                    st.session_state.pipeline,
+                                    max_iterations=50, # Quick tuning
+                                    time_limit=15
+                                )
+                                
+                                # Update Session
+                                st.session_state.pipeline = best_pipeline
+                                st.success(f"優化完成！IoU 分數提升至: {best_score:.4f}")
+                                st.rerun()
+                else:
+                    st.image(img_rgb, caption="原始影像")
 
                 # [NEW] Dynamic FPGA Estimation
                 if st.session_state.pipeline:
