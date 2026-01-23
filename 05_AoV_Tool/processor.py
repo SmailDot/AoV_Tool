@@ -220,4 +220,78 @@ class ImageProcessor:
     def create_thumbnail(self, image: np.ndarray, max_width: int = 640) -> np.ndarray:
         return basic.op_resize(image, {'width': {'default': max_width}, 'height': {'default': int(image.shape[0]*max_width/image.shape[1])}}, False)
 
+    def process_video(
+        self,
+        input_path: str,
+        output_path: str,
+        pipeline_json: List[Dict[str, Any]],
+        max_frames: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Process a video file frame by frame using the defined pipeline.
+        
+        Args:
+            input_path: Path to source video
+            output_path: Path to save processed video
+            pipeline_json: Algorithm pipeline
+            max_frames: Optional limit for testing
+            
+        Returns:
+            Dict containing processing stats
+        """
+        cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open video: {input_path}")
+
+        # Get Video Properties
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        if fps <= 0: fps = 30.0
+        
+        # Setup Video Writer (mp4v is widely supported in OpenCV)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        context = {} # State container for the entire video session
+        frame_count = 0
+        
+        print(f"\n[Video] Starting processing: {width}x{height} @ {fps}fps")
+        
+        try:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                if max_frames and frame_count >= max_frames:
+                    break
+                    
+                # Execute Pipeline for this frame
+                # Note: We pass 'context' so stateful nodes (like mog2, optical_flow) work correctly
+                processed_frame = self.execute_pipeline(frame, pipeline_json, debug_mode=False, context=context)
+                
+                # Ensure output size matches writer (some pipelines might resize)
+                if processed_frame.shape[1] != width or processed_frame.shape[0] != height:
+                    processed_frame = cv2.resize(processed_frame, (width, height))
+                
+                out.write(processed_frame)
+                frame_count += 1
+                
+                if frame_count % 30 == 0:
+                    print(f"  Processed {frame_count}/{total_frames} frames...")
+                    
+        finally:
+            cap.release()
+            out.release()
+            print(f"[Video] Finished. Saved to {output_path}")
+            
+        return {
+            "total_frames": frame_count,
+            "fps": fps,
+            "resolution": f"{width}x{height}"
+        }
+
     print("Processor loaded.")
