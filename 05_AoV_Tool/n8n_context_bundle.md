@@ -6,15 +6,53 @@
 ---
 
 ## 1. Integration Guide
-(See `n8n_integration_guide.md` for CLI usage)
+
+### Method A: CLI Adapter (Local Execution)
+Use `n8n_adapter.py` for direct command-line integration. This is suitable when n8n is running on the same machine or via SSH.
+(See `n8n_integration_guide.md` for details)
+
+### Method B: Flask API Server (Remote/Docker)
+**Recommended for most setups.** The `app_server.py` provides a REST API that n8n can call via the **HTTP Request** node.
+
+#### API Endpoint
+- **URL**: `http://<HOST_IP>:5000/process`
+- **Method**: `POST`
+- **Content-Type**: `application/json`
+
+#### Request Schema
+```json
+{
+  "query": "Detect coins in this video",
+  "image_path": "D:/data/input.mp4", 
+  "api_key": "sk-proj-...",
+  "use_mock": false
+}
+```
+*Note: `image_path` accepts both images (.jpg, .png) and videos (.mp4, .avi).*
+
+#### Response Schema
+```json
+{
+  "status": "success",
+  "type": "video",
+  "output_path": "D:\\outputs\\result_1700.mp4",
+  "pipeline_summary": ["Resize", "AdvancedCoinDetector"],
+  "fpga_estimated_clk": 12500,
+  "video_stats": {
+    "total_frames": 300,
+    "fps": 30.0,
+    "resolution": "640x480"
+  }
+}
+```
 
 ### Core Concept: The Adapter Pattern
-The `n8n_adapter.py` script acts as a bridge between n8n (JSON-based) and the Python backend. It enforces a strict schema for inputs and outputs.
+The `n8n_adapter.py` and `app_server.py` act as bridges between n8n and the Python backend.
 
 ### Critical Rules for Agents
-1. **Always use the Adapter**: Do not call `processor.py` directly unless you are debugging.
-2. **Check Logs**: The JSON output contains a `logs` field with reasoning. Use this to verify why specific algorithms were chosen.
-3. **Coin Detection**: If the query mentions "coins", the system automatically upgrades to the `advanced_coin_detection` node.
+1. **Prefer API over CLI**: API is persistent (faster) and handles state better.
+2. **Video Support**: The system automatically detects video files and switches to frame-by-frame processing with state context (e.g., for Optical Flow).
+3. **Coin Detection**: Queries mentioning "coins" trigger the optimized `advanced_coin_detection` logic.
 
 ---
 
