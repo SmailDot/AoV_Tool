@@ -93,6 +93,88 @@ class PromptMaster:
         # [NEW] Default fallback reasoning
         self.last_reasoning = ""
     
+    def get_optimization_suggestion(self, stats: Dict, current_pipeline: List, current_score: float, target_score: float) -> Dict[str, Any]:
+        """
+        [NEW] 獲取 LLM 優化建議 (Optimization Advisor)
+        """
+        if not self.llm_available:
+            return {"action": "none", "reasoning": "LLM not available"}
+            
+        prompt = f"""
+        You are a Computer Vision Expert Optimizing an OpenCV Pipeline.
+        
+        Current Status:
+        - IoU Score: {current_score:.4f} (Goal: {target_score})
+        - Pipeline: {[n['name'] for n in current_pipeline]}
+        
+        Image Analysis (Textual Representation):
+        - Prediction Fill Ratio: {stats.get('pred_fill', 0):.2f} (0=Empty, 1=Solid)
+        - Target Mask Fill Ratio: {stats.get('target_fill', 0):.2f} (0=Empty, 1=Solid)
+        - Noise Level: {stats.get('noise_level', 'Unknown')}
+        - Edges Detected: {stats.get('edge_count', 0)}
+        
+        Problem Diagnosis:
+        The current result does not match the target mask sufficiently.
+        
+        Rules:
+        1. If Pred Fill << Target Fill: We have edges/points but need a solid mask. Suggest 'dilate', 'morph_close', or 'find_contours' (to draw filled).
+        2. If Noise Level is High: Suggest 'gaussian_blur', 'median_blur', or 'bilateral_filter' at the beginning.
+        3. If Edges are weak/missing: Lower 'canny_threshold' or increase 'contrast' (equalizeHist).
+        4. If Pred Fill >> Target Fill: We have too much noise. Suggest 'erode', 'morph_open', or stricter threshold.
+        
+        RESPONSE FORMAT (JSON ONLY):
+        {{
+            "action": "modify_param" | "add_node" | "remove_node",
+            "target_node_index": 0,
+            "param_name": "threshold1", 
+            "new_value": 50,
+            "node_name": "dilate",
+            "reasoning": "Explain why in Traditional Chinese"
+        }}
+        """
+        
+        try:
+            if "google" in self.base_url:
+                res = self._call_google_native(prompt)
+            else:
+                res = self._call_openai_compatible(prompt)
+                
+            # The _call methods return 'pipeline' format, we need to adapt or parse raw if possible.
+            # Actually _call methods are tailored for 'pipeline' generation.
+            # We should probably refactor _call to be more generic or duplicate logic here.
+            # For simplicity, let's reuse _call_openai_compatible logic but adaptable.
+            
+            # Since _call_* methods are specific to "pipeline" key, I will implement a generic _chat_completion here.
+            return self._chat_completion(prompt)
+            
+        except Exception as e:
+            print(f"[PromptMaster] Optimization Error: {e}")
+            return {"action": "none", "error": str(e)}
+
+    def _chat_completion(self, prompt: str) -> Dict[str, Any]:
+        """
+        Generic Chat Completion
+        """
+        if "google" in self.base_url or "generativelanguage" in self.base_url:
+             # Google Logic (Simplified)
+             import google.generativeai as genai
+             model = genai.GenerativeModel(self.model.replace("google/", ""), generation_config={"response_mime_type": "application/json"})
+             response = model.generate_content(prompt)
+             return json.loads(response.text)
+        else:
+             # OpenAI Logic
+             from openai import OpenAI
+             client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+             response = client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=300
+             )
+             raw = response.choices[0].message.content.strip()
+             if "```" in raw: raw = raw.replace("```json", "").replace("```", "").strip()
+             return json.loads(raw)
+
     def get_llm_suggestion(self, user_query: str, use_mock: bool = False) -> Dict[str, Any]:
         """
         獲取 LLM 建議

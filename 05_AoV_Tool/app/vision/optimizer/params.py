@@ -45,6 +45,11 @@ class ParameterRules:
             if 'ksize' in param_lower: return (3, 11)
             if 'iter' in param_lower: return (1, 5)
 
+        # --- Exclude Geometric Transforms ---
+        # 防止優化器修改影像尺寸導致變形 (Flattening issue)
+        if any(x in func_lower for x in ['resize', 'rotate', 'flip', 'warp', 'transform']):
+            return (0, 0)
+
         # Default: Heuristic Range based on current value
         try:
             val = float(current_val)

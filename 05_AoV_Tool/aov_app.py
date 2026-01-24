@@ -22,8 +22,9 @@ from components.sidebar import render_sidebar
 from components.visualizer import render_pipeline_graph
 from components.style import apply_custom_style, render_hero_section
 
-# [NEW] Import AutoTuner
+# [NEW] Import AutoTuner & KnowledgeBase
 from app.vision.optimizer import AutoTuner
+from app.knowledge import get_knowledge_base
 from PIL import Image
 import numpy as np
 import cv2
@@ -59,9 +60,15 @@ if 'uploaded_image' not in st.session_state:
 if 'processed_image' not in st.session_state:
     st.session_state.processed_image = None
 
+# Initialize Knowledge Base (Lazy Load)
+if 'kb' not in st.session_state:
+    with st.spinner("載入知識庫 (Knowledge Base)..."):
+        st.session_state.kb = get_knowledge_base()
+
 # Aliases
 engine = st.session_state.engine
 processor = st.session_state.processor
+kb = st.session_state.kb
 
 # st.title("NKUST AoV 演算法視覺化工具") # Replaced by Hero Section
 render_hero_section()
@@ -113,11 +120,34 @@ with col_left:
                 st.error("無法解碼影像，請確認檔案格式是否正確。")
             else:
                 st.session_state.uploaded_image = img_bgr
-                
                 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 
+                # [NEW] Knowledge Base Suggestion Area
+                with st.expander("🔍 智慧推薦 (Smart Suggest)", expanded=False):
+                    if st.button("分析圖片並搜尋相似案例", type="primary"):
+                        with st.spinner("正在搜尋知識庫..."):
+                            matches = kb.find_similar_cases(img_bgr)
+                            
+                        if matches:
+                            st.success(f"找到 {len(matches)} 個相似案例！")
+                            cols = st.columns(len(matches))
+                            for i, (case, score) in enumerate(matches):
+                                with cols[i]:
+                                    st.markdown(f"**相似度: {score:.2f}**")
+                                    st.caption(case.get('description', '無描述'))
+                                    st.json([n['name'] for n in case['pipeline']], expanded=False)
+                                    if st.button(f"套用案例 #{i+1}", key=f"apply_case_{i}"):
+                                        st.session_state.pipeline = case['pipeline']
+                                        # Recalc
+                                        h, w = img_bgr.shape[:2]
+                                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                        st.success("已套用 Pipeline！")
+                                        st.rerun()
+                        else:
+                            st.info("知識庫目前是空的，或是沒有找到相似案例。")
+
                 # ================= Auto-Tune (File Upload Mode) =================
-                enable_tuning = st.checkbox("🎯 啟用目標驅動優化 (Auto-Tune)", value=False)
+                enable_tuning = st.checkbox("🎯 啟用目標驅動優化 (Auto-Tune) (無需 API Key)", value=False)
                 
                 if enable_tuning:
                     st.info("請上傳一張與原圖大小相同的「目標遮罩 (Ground Truth Mask)」。\n(黑白圖片，白色代表目標區域)")
@@ -145,6 +175,12 @@ with col_left:
                             with col_preview2:
                                 st.image(mask_bin, caption="目標遮罩 (Target)", clamp=True)
                             
+                            # [NEW] Optimization Settings
+                            with st.expander("⚙️ 優化設定 (Optimization Settings)", expanded=False):
+                                opt_max_iters = st.slider("最大迭代次數 (Max Iterations)", 50, 2000, 500, step=50)
+                                opt_time_limit = st.slider("時間限制 (Time Limit, seconds)", 30, 600, 180, step=30)
+                                opt_target_score = st.slider("目標準確率 (Target IoU)", 0.5, 0.99, 0.92, step=0.01)
+
                             if st.session_state.pipeline:
                                 if st.button("🚀 開始自動優化 (Auto-Tune)", type="primary"):
                                     # Save original pipeline for comparison
@@ -153,19 +189,19 @@ with col_left:
                                     progress_bar = st.progress(0)
                                     status_text = st.empty()
                                     
-                                    with st.spinner("正在執行爬山演算法優化參數，請稍候..."):
+                                    with st.spinner("正在執行演化演算法優化參數 (Genetic Algorithm)..."):
                                         # Run Optimizer
-                                        tuner = AutoTuner()
+                                        tuner = AutoTuner(method='ga')
                                         status_text.text("初始化優化引擎...")
                                         
-                                        # Capture intermediate updates? 
-                                        # Currently AutoTuner is blocking. We can modify it to yield, but for now let's just run it.
+                                        # Increase limits for better convergence
                                         best_pipeline, best_score = tuner.tune_pipeline(
                                             img_bgr,
                                             mask_bin,
                                             st.session_state.pipeline,
-                                            max_iterations=50, 
-                                            time_limit=15
+                                            max_iterations=opt_max_iters,
+                                            time_limit=opt_time_limit,
+                                            target_score=opt_target_score
                                         )
                                         
                                         progress_bar.progress(100)
@@ -173,6 +209,15 @@ with col_left:
                                         
                                         # Update Session
                                         st.session_state.pipeline = best_pipeline
+                                        
+                                        # [Fix] Force update Streamlit widgets
+                                        # Update session_state keys for parameters to reflect new values in UI
+                                        for node in best_pipeline:
+                                            node_id = node.get('id')
+                                            for param_name, param_info in node.get('parameters', {}).items():
+                                                key = f"param_{node_id}_{param_name}"
+                                                if key in st.session_state:
+                                                    st.session_state[key] = param_info['default']
                                         
                                         # Force Re-execution for Preview
                                         try:
@@ -185,25 +230,48 @@ with col_left:
                                         
                                         # Show Diff
                                         with st.expander("參數變更報告", expanded=True):
-                                            for i, node in enumerate(best_pipeline):
-                                                old_node = original_pipeline[i]
-                                                node_name = node['name']
-                                                changed = False
-                                                diff_msg = []
-                                                
-                                                for param_key, param_info in node.get('parameters', {}).items():
-                                                    new_val = param_info['default']
-                                                    old_val = old_node['parameters'][param_key]['default']
+                                            # [Fix] Handle structure changes (Add/Remove nodes)
+                                            # If lengths differ, structural mutation happened.
+                                            if len(best_pipeline) != len(original_pipeline):
+                                                st.info(f"Pipeline 結構已變更：節點數 {len(original_pipeline)} -> {len(best_pipeline)}")
+                                                # Simple list of current nodes
+                                                st.markdown("### 新的 Pipeline 結構")
+                                                for idx, node in enumerate(best_pipeline):
+                                                    st.text(f"{idx}. {node['name']}")
+                                            else:
+                                                # Same length, check params
+                                                for i, node in enumerate(best_pipeline):
+                                                    # Safe access in case node structure is different even if length is same
+                                                    if i >= len(original_pipeline): break
                                                     
-                                                    # Simple equality check
-                                                    if new_val != old_val:
-                                                        changed = True
-                                                        diff_msg.append(f"{param_key}: {old_val} -> {new_val}")
-                                                
-                                                if changed:
-                                                    st.markdown(f"**{node_name}**: " + ", ".join(diff_msg))
-                                                else:
-                                                    st.caption(f"{node_name}: 無變更")
+                                                    old_node = original_pipeline[i]
+                                                    
+                                                    # Check if node name changed (Swap/Replace)
+                                                    if node['name'] != old_node['name']:
+                                                        st.warning(f"Node {i} Changed: {old_node['name']} -> {node['name']}")
+                                                        continue
+                                                        
+                                                    node_name = node['name']
+                                                    changed = False
+                                                    diff_msg = []
+                                                    
+                                                    for param_key, param_info in node.get('parameters', {}).items():
+                                                        # Safe access
+                                                        if 'parameters' not in old_node or param_key not in old_node['parameters']:
+                                                            continue
+                                                            
+                                                        new_val = param_info['default']
+                                                        old_val = old_node['parameters'][param_key]['default']
+                                                        
+                                                        # Simple equality check
+                                                        if new_val != old_val:
+                                                            changed = True
+                                                            diff_msg.append(f"{param_key}: {old_val} -> {new_val}")
+                                                    
+                                                    if changed:
+                                                        st.markdown(f"**{node_name}**: " + ", ".join(diff_msg))
+                                                    else:
+                                                        st.caption(f"{node_name}: 無變更")
                                         
                                         st.balloons()
                                         time.sleep(1) # Let user see the balloons
@@ -214,6 +282,13 @@ with col_left:
                             st.error("無法讀取遮罩圖片。")
                 else:
                     st.image(img_rgb, caption="原始影像")
+
+                # [NEW] Save Case to Knowledge Base
+                if st.session_state.pipeline and st.button("💾 保存為經驗 (Save Case)", help="將目前的 Pipeline 與圖片特徵存入知識庫"):
+                    desc = st.text_input("案例描述", value="我的成功案例")
+                    if st.button("確認保存"):
+                        kb.add_case(img_bgr, st.session_state.pipeline, desc)
+                        st.success("已保存至知識庫！下次遇到類似圖片時可自動推薦。")
 
                 # [NEW] Dynamic FPGA Estimation
                 if st.session_state.pipeline:

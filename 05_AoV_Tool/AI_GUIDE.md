@@ -1,84 +1,75 @@
-# AI Agent 指南：NKUST AoV Tool
+# AI_GUIDE.md - Agent Handoff Protocol
 
-> **這不是給人類看的 README，這是給你（未來的 AI Agent）看的交接文件。**
-> 當你接手這個專案時，請先閱讀此文件，了解專案的靈魂、架構與潛在坑點。
+> **Version**: 2.0 (Knowledge-Driven Edition)
+> **Last Updated**: 2026-01-24
+> **Status**: Production Ready
 
-## 1. 專案靈魂 (Project Identity)
-*   **名稱**: NKUST AoV Tool (Algorithm on Vision / FPGA)
-*   **定位**: 電腦視覺演算法的「快速原型設計」與「FPGA 資源估算」工具。
-*   **核心價值**: 
-    1.  **Low-Code/No-Code**: 讓不懂 OpenCV 的人能用自然語言設計 Pipeline。
-    2.  **Hardware-Aware**: 即時估算演算法在 FPGA 上的資源消耗 (DSP/LUT/BRAM)。
-    3.  **Self-Optimizing**: 具備目標驅動 (Target-Driven) 的自動調參能力。
-*   **主要開發者**: Sisyphus (你我他)。
+## 1. Project Identity
+**Name**: NKUST AoV Tool (FPGA-Aware Vision Pipeline Generator)
+**Goal**: A "Teacher-Student" system that evolves from a tool into a knowledge base. It allows users to generate, optimize, and store Computer Vision pipelines for FPGA deployment.
 
-## 2. 架構地圖 (Architecture Map)
+## 2. Core Architecture
 
-專案採用 **Streamlit (UI) + Flask (API) + OpenCV (Engine) + LLM (Brain)** 的混合架構。
+### Frontend (UI)
+- **File**: `aov_app.py` (Streamlit)
+- **Role**: The command center. Handles image upload, pipeline editing, and visualization.
+- **Key Components**:
+  - `components/node_editor.py`: Parameter editing (Auto-generated UI).
+  - `components/visualizer.py`: Graphviz pipeline visualization.
 
-```
-05_AoV_Tool/
-├── aov_app.py              # [UI] Streamlit 入口。負責人機互動、畫布標註、Session State。
-├── app_server.py           # [API] Flask Server。負責 n8n 自動化串接 (無頭模式)。
-├── logic_engine.py         # [Brain] LLM 通訊、Prompt 工程、Mock 邏輯。
-├── processor.py            # [Muscle] 執行引擎。負責影像/影片的 I/O 與調度。
-├── library_manager.py      # [Data] 讀寫 tech_lib.json。
-├── auto_tuner.py           # [Solver] (Legacy) 已被 app/vision/optimizer 取代。
-│
-├── app/vision/             # [Core Logic]
-│   ├── ops/                # [Kernels] 真正的 OpenCV 實作 (basic, edge, detect...)
-│   └── optimizer/          # [Optimizer] 自動調參引擎 (Hill Climbing, Evaluator)
-│
-├── components/             # [UI Components] 側邊欄、視覺化圖表、PyVis 流程圖。
-└── tech_lib.json           # [DB] 演算法規格書、參數定義、FPGA 資源表。
-```
+### Backend (Logic & Processing)
+- **Brain**: `logic_engine.py` (LLM Orchestration & Prompt Engineering).
+- **Muscle**: `processor.py` (OpenCV Execution Engine).
+- **Database**: `library_manager.py` (Manages `tech_lib.json` - Algorithm definitions).
 
-## 3. 關鍵機制 (Critical Mechanisms)
+### Intelligence Modules (The "Special Sauce")
+1.  **AutoTuner (app/vision/optimizer)**:
+    -   **Goal**: Automatically tune parameters to match a ground truth mask.
+    -   **Tech**: Genetic Algorithm (GA) with Structural Mutation + Heuristic Expert Logic.
+    -   **Feature**: "LLM Vision Feedback" (Simulated or Real) to diagnose image issues (too dark, too noisy) and suggest fixes.
+    -   **Fixes Applied**: Smart Resize protection (anti-flattening), Aspect Ratio checks.
 
-### 3.1. 雙模式運作 (Dual-Mode Operation)
-*   **UI Mode (`run_tool.py`)**: 提供完整的人機介面，支援互動式畫布與即時預覽。
-*   **API Mode (`app_server.py`)**: 提供 REST API (`POST /process`)，專供 **n8n** 或其他自動化工具呼叫。支援 `plan_only` (秒回 JSON) 與 `full` (完整運算) 模式。
+2.  **Knowledge Base (app/knowledge)**:
+    -   **Goal**: "The Master's Notebook" - Store and retrieve successful experiences.
+    -   **Tech**: **Multimodal RAG** (CLIP + FAISS).
+    -   **Flow**: Image -> CLIP Embedding -> FAISS Vector Search -> Top-k Similar Cases.
+    -   **Files**: `base.py` (Core Logic), `knowledge_db.json` (Metadata).
 
-### 3.2. 目標驅動優化 (Target-Driven Optimization)
-*   **核心**: `app.vision.optimizer.AutoTuner`。
-*   **邏輯**: 使用 **Hill Climbing** 演算法，自動調整 Pipeline 參數，使運算結果與使用者提供的 **Ground Truth Mask** (黑白遮罩) 達到最大 **IoU**。
-*   **流程**: 
-    1. LLM 產生骨架 (Pipeline Structure)。
-    2. 使用者上傳 Mask。
-    3. AutoTuner 瘋狂微調參數 (Parameter Fine-tuning)。
+## 3. Key Features & Workflows
 
-### 3.3. 影片支援 (Video Support)
-*   **處理器**: `processor.process_video()`。
-*   **邏輯**: 逐幀處理，並維護 `context` 狀態以支援時序演算法 (如 Optical Flow, Background Subtraction)。
-*   **解析度**: 輸出影片會自動適應 Pipeline 的最終尺寸 (例如經過 Resize 後)。
+### A. Pipeline Generation (LLM)
+- User types "Detect coins" -> LLM generates JSON pipeline -> Loaded into Editor.
 
-### 3.4. 雙通道 LLM (Dual-Core LLM)
-*   **OpenAI 通道**: 標準 API。
-*   **Google 原生通道**: 使用 `google.generativeai` SDK，避開相容層 Bug。
-*   **Mock 模式**: 強大的 Mock 邏輯，能回傳詳細的 JSON 分析報告，即使沒聯網也能展示功能。
+### B. Auto-Tuning (Optimization)
+- **Input**: Source Image + Target Mask (Binary).
+- **Process**: 
+    -   GA tries to mutate parameters (Hill Climbing).
+    -   Structural Mutation tries to Add/Remove nodes (e.g., adding `Dilate` to fill holes).
+    -   **Safety**: Resizes are locked to aspect ratio to prevent distortion.
 
-## 4. 常見坑點 (Known Issues & Fixes)
+### C. Knowledge Retrieval (Smart Suggest)
+- **Input**: New Image.
+- **Action**: Click "Smart Suggest".
+- **Backend**: CLIP extracts visual features -> Searches FAISS DB.
+- **Output**: Recommends pipelines from similar historical cases (e.g., "This looks like the 'Metal Scratch' case").
 
-| 症狀 | 原因 | 解法 |
-|------|------|------|
-| **st_canvas 報錯** | Streamlit 1.52+ 移除了 `image_to_url` API。 | `aov_app.py` 中有 Monkey Patch 修復此問題；或者改用「遮罩上傳模式」。 |
-| **PyVis 流程圖空白** | Windows 編碼 (CP950) 導致 HTML 生成失敗。 | `visualizer.py` 改用 `generate_html()` 與 `components.html` 直接渲染字串。 |
-| **n8n 連不上** | `localhost` 指向錯誤或沒有 HTTPS。 | 使用 `expose_server.py` (ngrok) 建立外部隧道。 |
-| **影片解析度跑掉** | `VideoWriter` 初始化太早。 | `processor.py` 改為「Lazy Init」，等第一幀處理完確定尺寸後再初始化 Writer。 |
+## 4. Maintenance & known Issues
 
-## 5. 未來擴充指南 (Future Roadmap)
+### File Structure
+- `app/`: Core application logic (Knowledge, Vision, Engine).
+- `components/`: UI sub-modules.
+- `lib/`: External libraries or legacy code.
+- `tech_lib.json`: **CRITICAL**. Defines all available nodes. If you add a new OpenCV function, you MUST add it here first.
 
-如果你要...
-1.  **新增演算法**:
-    *   在 `app/vision/ops/` 實作函式。
-    *   在 `tech_lib.json` 定義參數與 FPGA 消耗。
-    *   在 `processor.py` 的 `operation_map` 註冊。
-    *   在 `app/vision/optimizer/params.py` 定義參數調整範圍。
-2.  **優化 AutoTuner**:
-    *   在 `app/vision/optimizer/strategy.py` 實作新的策略 (如 Genetic Algorithm)。
-    *   在 `app/vision/optimizer/evaluator.py` 加入新的評分指標 (如 Edge Continuity)。
-3.  **整合 n8n**:
-    *   參考 `n8n_context_bundle.md` 與 `example_payload.json`。
+### Common Pitfalls
+1.  **Streamlit State**: `st.session_state` is volatile. Always ensure state sync when modifying backend objects (like AutoTuner does).
+2.  **OpenCV Types**: `st.number_input` crashes if given `numpy.int`. Always cast to `int()` or `float()` in UI code.
+3.  **Resize Distortion**: `cv2.resize` with fixed W/H destroys aspect ratio. Use the `op_resize` in `basic.py` which handles `0` as "Auto".
+
+### Roadmap (Future Agents)
+- [ ] **Cloud Storage**: Move `knowledge_db.json` and images to Google Cloud Storage (GCS) for team sharing.
+- [ ] **Real LLM Feedback**: Connect a real GPT-4o-Vision key to `AutoTuner` to replace the "Simulated Expert".
+- [ ] **FPGA Export**: Enhance `code_generator.py` to support more HLS pragmas.
 
 ---
-*Generated by Sisyphus (2026-01-24)*
+*Handed off by Sisyphus Agent - The "Teacher-Student" Architect.*

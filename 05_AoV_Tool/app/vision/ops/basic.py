@@ -17,6 +17,23 @@ def op_median_blur(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
 def op_resize(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
     w = int(params.get('width', {}).get('default', 640))
     h = int(params.get('height', {}).get('default', 480))
+    
+    # [Smart Resize]
+    # If one dimension is 0 or -1, maintain aspect ratio
+    current_h, current_w = img.shape[:2]
+    
+    # 如果使用者沒有指定（或指定為0/-1），則預設維持原圖尺寸，不進行任何縮放
+    # 這是為了防止在沒有特別理由的情況下改變影像幾何結構
+    if w <= 0 and h <= 0:
+        return img 
+        
+    if w <= 0:
+        ratio = h / current_h
+        w = int(current_w * ratio)
+    elif h <= 0:
+        ratio = w / current_w
+        h = int(current_h * ratio)
+        
     return cv2.resize(img, (w, h))
 
 def op_bgr2gray(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:

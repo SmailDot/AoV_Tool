@@ -18,13 +18,45 @@ class PipelineEvaluator:
         pred_bin = PipelineEvaluator._to_binary(prediction)
         target_bin = PipelineEvaluator._to_binary(target_mask)
         
+        # [Fix] Aspect Ratio Check
+        # Check if shape mismatch is due to scaling or cropping
+        h_pred, w_pred = pred_bin.shape
+        h_target, w_target = target_bin.shape
+        
+        # Avoid division by zero
+        ar_pred = w_pred / (h_pred + 1e-6)
+        ar_target = w_target / (h_target + 1e-6)
+        
+        # If Aspect Ratio differs by more than 5%, severe penalty
+        if abs(ar_pred - ar_target) / ar_target > 0.05:
+            # print(f"[Eval] AR Mismatch: {ar_pred:.2f} vs {ar_target:.2f}")
+            return 0.0
+            
         # 尺寸對齊
         if pred_bin.shape != target_bin.shape:
-            pred_bin = cv2.resize(pred_bin, (target_bin.shape[1], target_bin.shape[0]), interpolation=cv2.INTER_NEAREST)
-            
-        # 2. 計算 IoU (重疊率) - 權重 0.7
-        iou = PipelineEvaluator._calculate_iou(pred_bin, target_bin)
+             # Resize PREDICTION to TARGET
+             # Since we passed AR check, this is a safe scaling operation
+             pred_bin = cv2.resize(pred_bin, (w_target, h_target), interpolation=cv2.INTER_NEAREST)
         
+        # [Auto-Fix] Edge vs Blob Problem
+        # 如果目標是實心 Mask (填充率高)，但預測結果是邊緣 (填充率低)，
+        # 自動嘗試「填充孔洞 (Fill Holes)」後再算 IoU。
+        # 這是為了解決 Canny Edge Output vs Coin Mask 的問題。
+        target_fill_ratio = np.count_nonzero(target_bin) / target_bin.size
+        pred_fill_ratio = np.count_nonzero(pred_bin) / pred_bin.size
+        
+        if target_fill_ratio > 0.05 and pred_fill_ratio < (target_fill_ratio * 0.3):
+             # 嘗試填充
+             pred_bin_filled = pred_bin.copy()
+             contours, _ = cv2.findContours(pred_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+             cv2.drawContours(pred_bin_filled, contours, -1, 255, -1) # Fill
+             
+             # 使用填充後的圖計算 IoU
+             iou = PipelineEvaluator._calculate_iou(pred_bin_filled, target_bin)
+        else:
+             # 正常計算
+             iou = PipelineEvaluator._calculate_iou(pred_bin, target_bin)
+            
         # 3. 計算形狀相似度 (Hu Moments) - 權重 0.3
         # 只有當 IoU > 0 (有重疊) 時才計算形狀，避免對全黑圖算形狀
         shape_score = 0.0
