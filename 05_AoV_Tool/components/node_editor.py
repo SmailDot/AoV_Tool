@@ -24,6 +24,9 @@ def render_parameter_editor(node: dict, idx: int, node_id: str):
         with col_p2:
             key = f"param_{node_id}_{param_name}"
             
+            # Debug: Check for potential collision or bad values
+            # print(f"[Debug] Rendering {key}: Type={type(param_default)}, Value={param_default}")
+
             # Boolean
             if isinstance(param_default, bool):
                 new_value = st.checkbox(str(param_desc), value=param_default, key=key, label_visibility="collapsed")
@@ -39,9 +42,14 @@ def render_parameter_editor(node: dict, idx: int, node_id: str):
                 new_value = st.number_input(str(param_desc), value=float(param_default), step=0.1, format="%.2f", key=key, label_visibility="collapsed")
             
             # List (as string)
-            elif isinstance(param_default, list):
+            elif isinstance(param_default, list) or isinstance(param_default, tuple):
                 # [Fix] Handle potential non-string conversion issues
-                val_str = json.dumps(param_default) if isinstance(param_default, (dict, list)) else str(param_default)
+                try:
+                    val_str = json.dumps(param_default) if isinstance(param_default, (dict, list, tuple)) else str(param_default)
+                except Exception as e:
+                    print(f"[Error] Failed to serialize parameter {param_name}: {e}")
+                    val_str = str(param_default)
+
                 new_value_str = st.text_input(str(param_desc), value=val_str, key=key, label_visibility="collapsed")
                 try:
                     new_value = json.loads(new_value_str)

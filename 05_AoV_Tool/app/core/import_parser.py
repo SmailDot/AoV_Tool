@@ -11,7 +11,7 @@ Multi-Format Import Parser for NKUST AoV Tool
 import json
 import re
 from typing import List, Dict, Any, Optional
-from library_manager import LibraryManager
+from .library_manager import LibraryManager
 
 
 class ImportParser:

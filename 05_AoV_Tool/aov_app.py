@@ -7,14 +7,16 @@ import streamlit as st
 import cv2
 import numpy as np
 import json
+import os
+import time
 
-from logic_engine import LogicEngine
-from processor import ImageProcessor
-from library_manager import LibraryManager
-from project_manager import ProjectManager
-from import_parser import ImportParser
-from code_generator import CodeGenerator
-from templates import get_default_templates
+from app.core.logic_engine import LogicEngine
+from app.core.processor import ImageProcessor
+from app.core.library_manager import LibraryManager
+from app.core.project_manager import ProjectManager
+from app.core.import_parser import ImportParser
+from app.core.code_generator import CodeGenerator
+from app.core.templates import get_default_templates
 
 # Import Refactored Components
 from components.node_editor import render_parameter_editor
@@ -217,7 +219,20 @@ with col_left:
                                             for param_name, param_info in node.get('parameters', {}).items():
                                                 key = f"param_{node_id}_{param_name}"
                                                 if key in st.session_state:
-                                                    st.session_state[key] = param_info['default']
+                                                    val = param_info['default']
+                                                    # Handle types to match widget expectations
+                                                    if isinstance(val, (list, dict, tuple)):
+                                                        # Text Input expects string (JSON)
+                                                        try:
+                                                            st.session_state[key] = json.dumps(val)
+                                                        except:
+                                                            st.session_state[key] = str(val)
+                                                    elif isinstance(val, (int, float, bool)):
+                                                        # Number/Checkbox expect raw values
+                                                        st.session_state[key] = val
+                                                    else:
+                                                        # Fallback to string
+                                                        st.session_state[key] = str(val)
                                         
                                         # Force Re-execution for Preview
                                         try:
@@ -287,8 +302,21 @@ with col_left:
                 if st.session_state.pipeline and st.button("💾 保存為經驗 (Save Case)", help="將目前的 Pipeline 與圖片特徵存入知識庫"):
                     desc = st.text_input("案例描述", value="我的成功案例")
                     if st.button("確認保存"):
-                        kb.add_case(img_bgr, st.session_state.pipeline, desc)
-                        st.success("已保存至知識庫！下次遇到類似圖片時可自動推薦。")
+                        # Save image to uploads folder first
+                        timestamp = int(time.time())
+                        save_path = f"uploads/case_{timestamp}.jpg"
+                        try:
+                            # Create directory if not exists
+                            os.makedirs("uploads", exist_ok=True)
+                            
+                            # Convert BGR (OpenCV) to RGB for PIL or save directly using cv2
+                            cv2.imwrite(save_path, img_bgr)
+                            
+                            # Add to KB
+                            kb.add_case(save_path, st.session_state.pipeline, desc)
+                            st.success(f"已保存至知識庫！(Path: {save_path})")
+                        except Exception as e:
+                            st.error(f"保存失敗: {e}")
 
                 # [NEW] Dynamic FPGA Estimation
                 if st.session_state.pipeline:
@@ -631,12 +659,15 @@ with col_left:
                         st.success(f"Video Complete: {stats['resolution']} @ {stats['fps']}fps")
                     else:
                         # Image Execution
-                        result = processor.execute_pipeline(
-                            st.session_state.uploaded_image,
-                            active_pipeline
-                        )
-                        st.session_state.processed_image = result
-                        st.success("Complete")
+                        if st.session_state.uploaded_image is not None:
+                            result = processor.execute_pipeline(
+                                st.session_state.uploaded_image,
+                                active_pipeline
+                            )
+                            st.session_state.processed_image = result
+                            st.success("Complete")
+                        else:
+                            st.error("No image uploaded")
                         
                 except Exception as e:
                     st.error(f"Failed: {e}")

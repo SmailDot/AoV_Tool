@@ -49,10 +49,10 @@ pip install -r requirements.txt
 
 #### 3. 啟動應用程式
 ```bash
-# 使用虛擬環境
-.venv\Scripts\python.exe -m streamlit run aov_app.py
+# [推薦] Windows 快速啟動
+start.bat
 
-# 或者直接執行（如果 streamlit 在 PATH 中）
+# 或者手動執行
 streamlit run aov_app.py
 ```
 
@@ -101,11 +101,14 @@ http://localhost:8501
 ### 核心檔案
 ```
 05_AoV_Tool/
+├── start.bat               # [NEW] 快速啟動腳本
 ├── aov_app.py              # Streamlit 主應用程式
-├── logic_engine.py         # LLM 整合與 Pipeline 生成引擎
-├── processor.py            # 影像執行引擎（OpenCV 操作）
-├── project_manager.py      # 專案匯入/匯出管理器
-├── library_manager.py      # 演算法資料庫管理器
+├── app/
+│   └── core/               # 核心邏輯 (Logic, Processor, Managers)
+│       ├── logic_engine.py
+│       ├── processor.py
+│       ├── library_manager.py
+│       └── ...
 ├── tech_lib.json           # 演算法資料庫（FPGA 約束）
 ├── requirements.txt        # Python 依賴清單
 └── sample_coin_detection.json  # 範例專案檔

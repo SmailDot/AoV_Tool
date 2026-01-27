@@ -12,7 +12,7 @@ Logic Engine for NKUST AoV Tool
 import json
 import os
 from typing import List, Dict, Optional, Any
-from library_manager import LibraryManager
+from .library_manager import LibraryManager
 
 # ==================== Utility: Safe Print (Windows Encoding Fix) ====================
 

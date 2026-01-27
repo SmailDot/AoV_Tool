@@ -10,8 +10,8 @@ from typing import Optional, List, Dict
 
 # Import existing modules
 # Assuming this script is placed in the root directory: D:\NKUST_LAB_Work_Data\Lab work\cv-algorithm-study\05_AoV_Tool
-from logic_engine import LogicEngine
-from processor import ImageProcessor
+from app.core.logic_engine import LogicEngine
+from app.core.processor import ImageProcessor
 
 @dataclass
 class AoVConfig:

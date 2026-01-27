@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import faiss
 from PIL import Image
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 
 class KnowledgeBase:
     """
@@ -92,7 +92,7 @@ class KnowledgeBase:
         
         print(f"[KnowledgeBase] Saved case {case_id}: {description}")
 
-    def find_similar_cases(self, image_path: str, top_k: int = 3) -> List[Tuple[Dict, float]]:
+    def find_similar_cases(self, image_path: Union[str, np.ndarray], top_k: int = 3) -> List[Tuple[Dict, float]]:
         """
         以圖搜圖：找到最像的案例 (使用 FAISS)
         """

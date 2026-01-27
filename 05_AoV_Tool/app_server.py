@@ -8,9 +8,9 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 # Import Core Components
-from logic_engine import LogicEngine
-from processor import ImageProcessor
-from code_generator import CodeGenerator
+from app.core.logic_engine import LogicEngine
+from app.core.processor import ImageProcessor
+from app.core.code_generator import CodeGenerator
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'

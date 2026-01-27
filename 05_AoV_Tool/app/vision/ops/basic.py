@@ -22,6 +22,21 @@ def op_resize(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
     # If one dimension is 0 or -1, maintain aspect ratio
     current_h, current_w = img.shape[:2]
     
+    # [Fix] Auto-Correction for Aspect Ratio Distortion
+    # If user sets both w and h, but they cause significant distortion (>20%), 
+    # and it looks like a "default" param set (e.g. 640x480 on a square image),
+    # we force maintain aspect ratio based on width.
+    if w > 0 and h > 0:
+        target_ar = w / (h + 1e-6)
+        src_ar = current_w / (current_h + 1e-6)
+        distortion = abs(target_ar - src_ar) / src_ar
+        
+        # If distortion is high (>20%), assume user wants width priority and auto height
+        # This is a heuristic to prevent "squashed" images from default params
+        if distortion > 0.2:
+            # print(f"[Resize] Detected distortion ({distortion:.2f}). Forcing auto-height.")
+            h = 0 # Force auto calculation below
+
     # 如果使用者沒有指定（或指定為0/-1），則預設維持原圖尺寸，不進行任何縮放
     # 這是為了防止在沒有特別理由的情況下改變影像幾何結構
     if w <= 0 and h <= 0:

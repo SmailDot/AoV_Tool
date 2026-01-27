@@ -11,9 +11,8 @@ from .evaluator import PipelineEvaluator
 from .params import ParameterRules
 
 # External Dependencies (Assume running from root)
-from processor import ImageProcessor
-
-from library_manager import LibraryManager
+from app.core.processor import ImageProcessor
+from app.core.library_manager import LibraryManager
 
 class AutoTuner:
     """
@@ -43,7 +42,7 @@ class AutoTuner:
         Implementation of LLM-in-the-Loop Optimization
         """
         import streamlit as st
-        from logic_engine import LogicEngine # Import here to avoid circular dependency
+        from app.core.logic_engine import LogicEngine # Import here to avoid circular dependency
         
         print("[AutoTuner] Starting LLM Vision Feedback Loop...")
         best_pipeline = deepcopy(initial_pipeline)
