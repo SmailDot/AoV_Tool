@@ -23,6 +23,7 @@ from components.node_editor import render_parameter_editor
 from components.sidebar import render_sidebar
 from components.visualizer import render_pipeline_graph
 from components.style import apply_custom_style, render_hero_section
+from components.knowledge_tree import render_d3_tree
 
 # [NEW] Import AutoTuner & KnowledgeBase
 from app.vision.optimizer import AutoTuner
@@ -78,16 +79,16 @@ render_hero_section()
 col_left, col_right = st.columns([1, 1.5], gap="large") # Added gap
 
 with col_left:
-    st.markdown("### 🛠️ Pipeline 編輯器")
+    # ================= 1. Global Input (Uploader) =================
+    st.subheader("1. 影像輸入")
     
     with st.container():
-        st.caption("1. 上傳影像")
+        st.caption("上傳影像/影片")
         uploaded_file = st.file_uploader(
             "選擇影像/影片檔案",
             type=['jpg', 'jpeg', 'png', 'bmp', 'mp4', 'avi', 'mov'],
             label_visibility="collapsed"
         )
-
     
     if uploaded_file is not None:
         file_type = uploaded_file.name.split('.')[-1].lower()
@@ -124,32 +125,8 @@ with col_left:
                 st.session_state.uploaded_image = img_bgr
                 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 
-                # [NEW] Knowledge Base Suggestion Area
-                with st.expander("🔍 智慧推薦 (Smart Suggest)", expanded=False):
-                    if st.button("分析圖片並搜尋相似案例", type="primary"):
-                        with st.spinner("正在搜尋知識庫..."):
-                            matches = kb.find_similar_cases(img_bgr)
-                            
-                        if matches:
-                            st.success(f"找到 {len(matches)} 個相似案例！")
-                            cols = st.columns(len(matches))
-                            for i, (case, score) in enumerate(matches):
-                                with cols[i]:
-                                    st.markdown(f"**相似度: {score:.2f}**")
-                                    st.caption(case.get('description', '無描述'))
-                                    st.json([n['name'] for n in case['pipeline']], expanded=False)
-                                    if st.button(f"套用案例 #{i+1}", key=f"apply_case_{i}"):
-                                        st.session_state.pipeline = case['pipeline']
-                                        # Recalc
-                                        h, w = img_bgr.shape[:2]
-                                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                                        st.success("已套用 Pipeline！")
-                                        st.rerun()
-                        else:
-                            st.info("知識庫目前是空的，或是沒有找到相似案例。")
-
                 # ================= Auto-Tune (File Upload Mode) =================
-                enable_tuning = st.checkbox("🎯 啟用目標驅動優化 (Auto-Tune) (無需 API Key)", value=False)
+                enable_tuning = st.checkbox("啟用目標驅動優化 (Auto-Tune) (無需 API Key)", value=False)
                 
                 if enable_tuning:
                     st.info("請上傳一張與原圖大小相同的「目標遮罩 (Ground Truth Mask)」。\n(黑白圖片，白色代表目標區域)")
@@ -178,13 +155,13 @@ with col_left:
                                 st.image(mask_bin, caption="目標遮罩 (Target)", clamp=True)
                             
                             # [NEW] Optimization Settings
-                            with st.expander("⚙️ 優化設定 (Optimization Settings)", expanded=False):
+                            with st.expander("優化設定 (Optimization Settings)", expanded=False):
                                 opt_max_iters = st.slider("最大迭代次數 (Max Iterations)", 50, 2000, 500, step=50)
                                 opt_time_limit = st.slider("時間限制 (Time Limit, seconds)", 30, 600, 180, step=30)
                                 opt_target_score = st.slider("目標準確率 (Target IoU)", 0.5, 0.99, 0.92, step=0.01)
 
                             if st.session_state.pipeline:
-                                if st.button("🚀 開始自動優化 (Auto-Tune)", type="primary"):
+                                if st.button("開始自動優化 (Auto-Tune)", type="primary"):
                                     # Save original pipeline for comparison
                                     original_pipeline = [n.copy() for n in st.session_state.pipeline]
                                     
@@ -298,380 +275,569 @@ with col_left:
                 else:
                     st.image(img_rgb, caption="原始影像")
 
-                # [NEW] Save Case to Knowledge Base
-                if st.session_state.pipeline and st.button("💾 保存為經驗 (Save Case)", help="將目前的 Pipeline 與圖片特徵存入知識庫"):
-                    desc = st.text_input("案例描述", value="我的成功案例")
-                    if st.button("確認保存"):
-                        # Save image to uploads folder first
-                        timestamp = int(time.time())
-                        save_path = f"uploads/case_{timestamp}.jpg"
-                        try:
-                            # Create directory if not exists
-                            os.makedirs("uploads", exist_ok=True)
-                            
-                            # Convert BGR (OpenCV) to RGB for PIL or save directly using cv2
-                            cv2.imwrite(save_path, img_bgr)
-                            
-                            # Add to KB
-                            kb.add_case(save_path, st.session_state.pipeline, desc)
-                            st.success(f"已保存至知識庫！(Path: {save_path})")
-                        except Exception as e:
-                            st.error(f"保存失敗: {e}")
-
                 # [NEW] Dynamic FPGA Estimation
                 if st.session_state.pipeline:
                     h, w = img_bgr.shape[:2]
                     engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                    st.toast(f"FPGA 資源已根據解析度 ({w}x{h}) 更新", icon="⚡")
-    
-    st.divider()
-    
-    st.subheader("2. 描述需求")
-    user_query = st.text_input(
-        "輸入需求描述",
-        placeholder="例如：偵測硬幣、找出邊緣、降噪處理"
-    )
-    
-    col_gen1, col_gen2 = st.columns(2)
-    
-    with col_gen1:
-        if st.button("Generate Pipeline", type="primary", use_container_width=True):
-            if user_query:
-                # Update API Key if provided
-                if st.session_state.get('llm_api_key'):
-                    engine.prompt_master.api_key = st.session_state.llm_api_key
-                    engine.prompt_master.base_url = st.session_state.llm_base_url
-                    engine.prompt_master.model = st.session_state.get('llm_model_name', 'gpt-4o')
-                    engine.prompt_master.llm_available = True
-                
-                with st.spinner("Processing..."):
-                    result = engine.process_user_query(
-                        user_query, 
-                        use_mock_llm=st.session_state.get('use_mock_llm', True)
-                    )
-                    
-                    # Handle Error
-                    if result.get("error"):
-                        st.error(f"AI 生成失敗: {result['error']}")
-                        with st.expander("詳細錯誤資訊"):
-                            st.code(result.get('reasoning', 'No details'))
-                    else:
-                        # Success
-                        st.session_state.pipeline = result["pipeline"]
-                        st.session_state.last_reasoning = result.get("reasoning", "")
-                        
-                        # Initial calculation if image exists
-                        if st.session_state.uploaded_image is not None:
-                            h, w = st.session_state.uploaded_image.shape[:2]
-                            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                            
-                        st.success(f"已產生 {len(st.session_state.pipeline)} 個節點")
-                        st.rerun()
-            else:
-                st.warning("請先輸入需求描述")
-    
-    with col_gen2:
-        if st.button("Reset", use_container_width=True):
-            st.session_state.pipeline = []
-            st.session_state.processed_image = None
-            st.session_state.last_reasoning = ""
-            st.rerun()
-    
-    st.divider()
-
-    # [NEW] AI Reasoning Display
-    if st.session_state.get('last_reasoning'):
-        with st.expander("AI Reasoning", expanded=True):
-            st.info(st.session_state.last_reasoning)
-
-    # ========== 快速模板 (Templates) ==========
-    st.subheader("2.5 快速模板")
-    templates = get_default_templates()
-    selected_template = st.selectbox("選擇預設場景", list(templates.keys()))
-    
-    if st.button("Load Template", use_container_width=True):
-        raw_nodes = templates[selected_template]
-        hydrated_pipeline = []
-        
-        # Hydrate nodes with library data
-        for idx, raw_node in enumerate(raw_nodes):
-            func_name = raw_node['function']
-            # Try to find in library
-            algo_data = engine.lib_manager.get_algorithm(func_name, 'official')
-            if not algo_data:
-                algo_data = engine.lib_manager.get_algorithm(func_name, 'contributed')
-            
-            node_to_add = raw_node.copy()
-            if algo_data:
-                node_to_add['category'] = algo_data.get('category', 'unknown')
-                node_to_add['description'] = algo_data.get('description', '')
-                node_to_add['fpga_constraints'] = algo_data.get('fpga_constraints', {}).copy() # Copy!
-            else:
-                node_to_add['fpga_constraints'] = {"estimated_clk": 0, "resource_usage": "Unknown", "latency_type": "Software"}
-                
-            node_to_add['id'] = f"node_{idx}"
-            node_to_add['_enabled'] = True
-            hydrated_pipeline.append(node_to_add)
-            
-        st.session_state.pipeline = hydrated_pipeline
-        st.session_state.processed_image = None
-        
-        # Recalc if image exists
-        if st.session_state.uploaded_image is not None:
-            h, w = st.session_state.uploaded_image.shape[:2]
-            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-
-        st.success(f"已載入: {selected_template}")
-        st.rerun()
+                    st.toast(f"FPGA 資源已根據解析度 ({w}x{h}) 更新")
 
     st.divider()
-    
-    if st.session_state.pipeline:
-        st.subheader("3. Pipeline Editor")
-        
-        # ========== 新增節點功能 ==========
-        with st.expander("Add Node", expanded=False):
-            all_algos = engine.lib_manager.list_algorithms()
-            
-            algo_options = {}
-            for a in all_algos:
-                cn_name = a.get('name_zh', a['name'])
-                display_name = f"{a['name']} / {cn_name} ({a['category']})"
-                algo_options[display_name] = a
-            
-            selected_algo_name = st.selectbox("選擇演算法", list(algo_options.keys()), key="new_algo_select")
-            insert_position = st.number_input("插入位置", min_value=0, max_value=len(st.session_state.pipeline), value=len(st.session_state.pipeline), key="insert_pos")
-            
-            if st.button("Add Node", type="primary", use_container_width=True):
-                algo_data = algo_options[selected_algo_name]
-                algo_id = algo_data['_algo_id']
-                
-                new_node = {
-                    'id': f'node_{insert_position}',
-                    'name': algo_data['name'],
-                    'function': algo_data.get('opencv_function', algo_id),
-                    'category': algo_data['category'],
-                    'description': algo_data.get('description', ''),
-                    'parameters': algo_data.get('parameters', {}).copy(),
-                    'fpga_constraints': algo_data['fpga_constraints'].copy(),
-                    'source': 'manual_add',
-                    '_enabled': True
-                }
-                
-                st.session_state.pipeline.insert(insert_position, new_node)
-                
-                for i, n in enumerate(st.session_state.pipeline):
-                    n['id'] = f"node_{i}"
-                
-                if st.session_state.uploaded_image is not None:
-                    h, w = st.session_state.uploaded_image.shape[:2]
-                    engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                    
-                st.success(f"已新增 {algo_data['name']}")
-                st.rerun()
-        
-        for idx, node in enumerate(st.session_state.pipeline):
-            node_id = node.get('id', f'node_{idx}')
-            node_name = node.get('name', '未知節點')
-            fpga = node.get('fpga_constraints', {})
-            is_enabled = node.get('_enabled', True)
-            
-            with st.expander(f"[{idx}] {node_name}" + (" (Disabled)" if not is_enabled else ""), expanded=False):
-                col_btn1, col_btn2, col_btn3, col_btn4, col_btn5 = st.columns(5)
-                
-                with col_btn1:
-                    if st.button("Up", key=f"up_{idx}", disabled=(idx == 0)):
-                        st.session_state.pipeline[idx], st.session_state.pipeline[idx-1] = \
-                            st.session_state.pipeline[idx-1], st.session_state.pipeline[idx]
-                        for i, n in enumerate(st.session_state.pipeline):
-                            n['id'] = f"node_{i}"
-                        st.rerun()
-                
-                with col_btn2:
-                    if st.button("Down", key=f"down_{idx}", disabled=(idx == len(st.session_state.pipeline)-1)):
-                        st.session_state.pipeline[idx], st.session_state.pipeline[idx+1] = \
-                            st.session_state.pipeline[idx+1], st.session_state.pipeline[idx]
-                        for i, n in enumerate(st.session_state.pipeline):
-                            n['id'] = f"node_{i}"
-                        st.rerun()
-                
-                with col_btn3:
-                    move_to = st.number_input("Move to", min_value=0, max_value=len(st.session_state.pipeline)-1, value=idx, key=f"moveto_{idx}", label_visibility="collapsed")
-                    if move_to != idx and st.button("GO", key=f"move_{idx}"):
-                        node_to_move = st.session_state.pipeline.pop(idx)
-                        st.session_state.pipeline.insert(move_to, node_to_move)
-                        for i, n in enumerate(st.session_state.pipeline):
-                            n['id'] = f"node_{i}"
-                        st.rerun()
-                
-                with col_btn4:
-                    skip_label = "Enable" if not is_enabled else "Skip"
-                    if st.button(skip_label, key=f"skip_{idx}"):
-                        st.session_state.pipeline[idx]['_enabled'] = not is_enabled
-                        st.rerun()
-                
-                with col_btn5:
-                    if st.button("Delete", key=f"del_{idx}"):
-                        st.session_state.pipeline.pop(idx)
-                        for i, n in enumerate(st.session_state.pipeline):
-                            n['id'] = f"node_{i}"
-                        st.rerun()
-                
-                st.divider()
-                
-                st.caption(f"類別: {node.get('category', 'N/A')}")
-                st.caption(f"函數: {node.get('function', 'N/A')}")
-                st.caption(f"狀態: {'啟用' if is_enabled else '已停用'}")
-                
-                st.markdown("**FPGA 時脈估計**")
-                
-                current_clk = fpga.get('estimated_clk', 0)
-                new_clk = st.number_input(
-                    "CLK (Auto-calculated)",
-                    min_value=0,
-                    value=current_clk,
-                    disabled=True, # Lock explicit edit if we use formulas, but maybe allow override?
-                    key=f"clk_{node_id}"
-                )
-                if 'clk_formula' in fpga:
-                    st.caption(f"Formula: `{fpga['clk_formula']}`")
-                
-                st.caption(f"資源: {fpga.get('resource_usage', 'Unknown')}")
-                st.caption(f"延遲: {fpga.get('latency_type', 'Unknown')}")
-                
-                # Render Parameters using Component
-                render_parameter_editor(node, idx, node_id)
-                
-                if '_warning' in node:
-                    st.warning(node['_warning'])
-    
-    st.divider()
-    
-    st.subheader("4. Project Management")
-    
-    with st.expander("Export Project", expanded=False):
-        st.caption("確保所有調整過的參數都會被保存")
-        
-        export_author = st.text_input("作者", placeholder="學號/姓名", key="export_author")
-        export_notes = st.text_area("備註", placeholder="說明此Pipeline的用途", height=80, key="export_notes")
-        export_project_name = st.text_input("專案名稱", placeholder="例如：硬幣偵測_V1", key="export_project_name")
-        
-        if st.session_state.pipeline:
-            json_str = ProjectManager.export_project_to_json(
-                st.session_state.pipeline,
-                author=export_author or "Unknown",
-                notes=export_notes,
-                project_name=export_project_name or "Untitled_Project"
-            )
-            
-            filename = ProjectManager.generate_project_filename(export_author or "Unknown")
-            
-            col_dl1, col_dl2 = st.columns(2)
-            
-            with col_dl1:
-                st.download_button(
-                    label="Download JSON",
-                    data=json_str,
-                    file_name=filename,
-                    mime="application/json",
-                    use_container_width=True,
-                    type="primary"
-                )
-            
-            with col_dl2:
-                if st.button("Save to Folder", use_container_width=True):
-                    try:
-                        save_path = f"e:/LAB_DATA/ORB/experiments/05_AoV_Tool/{filename}"
-                        with open(save_path, 'w', encoding='utf-8') as f:
-                            f.write(json_str)
-                        st.success(f"已儲存: {filename}")
-                    except Exception as e:
-                        st.error(f"儲存失敗: {e}")
-            
-            st.markdown("### Code Generation")
-            tab_py, tab_vhdl, tab_verilog = st.tabs(["Python", "VHDL", "Verilog"])
-            
-            with tab_py:
-                py_code = CodeGenerator.generate_python_script(st.session_state.pipeline)
-                st.code(py_code, language="python")
-                st.download_button("Download Python", py_code, "pipeline.py")
-                
-            with tab_vhdl:
-                vhdl_code = CodeGenerator.generate_vhdl(st.session_state.pipeline)
-                st.code(vhdl_code, language="vhdl")
-                st.download_button("Download VHDL", vhdl_code, "pipeline.vhd")
 
-            with tab_verilog:
-                verilog_code = CodeGenerator.generate_verilog(st.session_state.pipeline)
-                st.code(verilog_code, language="verilog")
-                st.download_button("Download Verilog", verilog_code, "pipeline.v")
-        else:
-            st.info("請先產生 Pipeline")
-    
-    with st.expander("Import Project", expanded=False):
-        uploaded_project = st.file_uploader(
-            "選擇檔案",
-            type=['json', 'dot', 'txt', 'md'],
-            key="project_uploader"
+    # ================= 2. Tabs =================
+    tab_editor, tab_kb = st.tabs(["Pipeline 編輯", "知識庫"])
+
+    # ----------------- Tab 1: Editor -----------------
+    with tab_editor:
+        st.subheader("2. 描述需求")
+        user_query = st.text_input(
+            "輸入需求描述",
+            placeholder="例如：偵測硬幣、找出邊緣、降噪處理"
         )
         
-        if uploaded_project is not None:
-            try:
-                json_content = uploaded_project.read().decode('utf-8')
-                file_extension = uploaded_project.name.split('.')[-1].lower()
-                
-                if file_extension == 'json':
-                    result = ProjectManager.load_project_from_json(json_content)
-                    if result["success"]:
-                        if st.button("Load Project", type="primary", use_container_width=True, key="load_project_btn"):
+        col_gen1, col_gen2 = st.columns(2)
+        
+        with col_gen1:
+            if st.button("Generate Pipeline", type="primary", use_container_width=True):
+                if user_query:
+                    # Update API Key if provided
+                    if st.session_state.get('llm_api_key'):
+                        engine.prompt_master.api_key = st.session_state.llm_api_key
+                        engine.prompt_master.base_url = st.session_state.llm_base_url
+                        engine.prompt_master.model = st.session_state.get('llm_model_name', 'gpt-4o')
+                        engine.prompt_master.llm_available = True
+                    
+                    with st.spinner("Processing..."):
+                        result = engine.process_user_query(
+                            user_query, 
+                            use_mock_llm=st.session_state.get('use_mock_llm', True)
+                        )
+                        
+                        # Handle Error
+                        if result.get("error"):
+                            st.error(f"AI 生成失敗: {result['error']}")
+                            with st.expander("詳細錯誤資訊"):
+                                st.code(result.get('reasoning', 'No details'))
+                        else:
+                            # Success
                             st.session_state.pipeline = result["pipeline"]
-                            st.session_state.processed_image = None
+                            st.session_state.last_reasoning = result.get("reasoning", "")
                             
+                            # Initial calculation if image exists
                             if st.session_state.uploaded_image is not None:
                                 h, w = st.session_state.uploaded_image.shape[:2]
                                 engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
                                 
-                            st.success("載入成功")
+                            st.success(f"已產生 {len(st.session_state.pipeline)} 個節點")
                             st.rerun()
-                    else:
-                        st.error(f"失敗: {result['error']}")
-                # Simplified for brevity - import parser logic remains same
-            except Exception as e:
-                st.error(f"錯誤: {str(e)}")
-    
-    st.divider()
-    
-    if st.session_state.pipeline and (st.session_state.uploaded_image is not None or st.session_state.get('is_video')):
-        if st.button("Run Pipeline", type="primary", use_container_width=True):
-            with st.spinner("Processing..."):
-                try:
-                    active_pipeline = [n for n in st.session_state.pipeline if n.get('_enabled', True)]
+                else:
+                    st.warning("請先輸入需求描述")
+        
+        with col_gen2:
+            if st.button("Reset", use_container_width=True):
+                st.session_state.pipeline = []
+                st.session_state.processed_image = None
+                st.session_state.last_reasoning = ""
+                st.rerun()
+        
+        st.divider()
+
+        # [NEW] AI Reasoning Display
+        if st.session_state.get('last_reasoning'):
+            with st.expander("AI Reasoning", expanded=True):
+                st.info(st.session_state.last_reasoning)
+
+        # ========== 快速模板 (Templates) ==========
+        st.subheader("2.5 快速模板")
+        templates = get_default_templates()
+        selected_template = st.selectbox("選擇預設場景", list(templates.keys()))
+        
+        if st.button("Load Template", use_container_width=True):
+            raw_nodes = templates[selected_template]
+            hydrated_pipeline = []
+            
+            # Hydrate nodes with library data
+            for idx, raw_node in enumerate(raw_nodes):
+                func_name = raw_node['function']
+                # Try to find in library
+                algo_data = engine.lib_manager.get_algorithm(func_name, 'official')
+                if not algo_data:
+                    algo_data = engine.lib_manager.get_algorithm(func_name, 'contributed')
+                
+                node_to_add = raw_node.copy()
+                if algo_data:
+                    node_to_add['category'] = algo_data.get('category', 'unknown')
+                    node_to_add['description'] = algo_data.get('description', '')
+                    node_to_add['fpga_constraints'] = algo_data.get('fpga_constraints', {}).copy() # Copy!
+                else:
+                    node_to_add['fpga_constraints'] = {"estimated_clk": 0, "resource_usage": "Unknown", "latency_type": "Software"}
                     
-                    if st.session_state.get('is_video'):
-                        # Video Execution
-                        output_path = "temp_output.mp4"
-                        stats = processor.process_video(
-                            st.session_state.video_path,
-                            output_path,
-                            active_pipeline
-                        )
-                        st.session_state.processed_video_path = output_path
-                        st.success(f"Video Complete: {stats['resolution']} @ {stats['fps']}fps")
-                    else:
-                        # Image Execution
-                        if st.session_state.uploaded_image is not None:
-                            result = processor.execute_pipeline(
-                                st.session_state.uploaded_image,
+                node_to_add['id'] = f"node_{idx}"
+                node_to_add['_enabled'] = True
+                hydrated_pipeline.append(node_to_add)
+                
+            st.session_state.pipeline = hydrated_pipeline
+            st.session_state.processed_image = None
+            
+            # Recalc if image exists
+            if st.session_state.uploaded_image is not None:
+                h, w = st.session_state.uploaded_image.shape[:2]
+                engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+
+            st.success(f"已載入: {selected_template}")
+            st.rerun()
+
+        st.divider()
+        
+        if st.session_state.pipeline:
+            st.subheader("3. Pipeline Editor")
+            
+            # ========== 新增節點功能 ==========
+            with st.expander("Add Node", expanded=False):
+                all_algos = engine.lib_manager.list_algorithms()
+                
+                algo_options = {}
+                for a in all_algos:
+                    cn_name = a.get('name_zh', a['name'])
+                    display_name = f"{a['name']} / {cn_name} ({a['category']})"
+                    algo_options[display_name] = a
+                
+                selected_algo_name = st.selectbox("選擇演算法", list(algo_options.keys()), key="new_algo_select")
+                insert_position = st.number_input("插入位置", min_value=0, max_value=len(st.session_state.pipeline), value=len(st.session_state.pipeline), key="insert_pos")
+                
+                if st.button("Add Node", type="primary", use_container_width=True):
+                    algo_data = algo_options[selected_algo_name]
+                    algo_id = algo_data['_algo_id']
+                    
+                    new_node = {
+                        'id': f'node_{insert_position}',
+                        'name': algo_data['name'],
+                        'function': algo_data.get('opencv_function', algo_id),
+                        'category': algo_data['category'],
+                        'description': algo_data.get('description', ''),
+                        'parameters': algo_data.get('parameters', {}).copy(),
+                        'fpga_constraints': algo_data['fpga_constraints'].copy(),
+                        'source': 'manual_add',
+                        '_enabled': True
+                    }
+                    
+                    st.session_state.pipeline.insert(insert_position, new_node)
+                    
+                    for i, n in enumerate(st.session_state.pipeline):
+                        n['id'] = f"node_{i}"
+                    
+                    if st.session_state.uploaded_image is not None:
+                        h, w = st.session_state.uploaded_image.shape[:2]
+                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                        
+                    st.success(f"已新增 {algo_data['name']}")
+                    st.rerun()
+            
+            for idx, node in enumerate(st.session_state.pipeline):
+                node_id = node.get('id', f'node_{idx}')
+                node_name = node.get('name', '未知節點')
+                fpga = node.get('fpga_constraints', {})
+                is_enabled = node.get('_enabled', True)
+                
+                with st.expander(f"[{idx}] {node_name}" + (" (Disabled)" if not is_enabled else ""), expanded=False):
+                    col_btn1, col_btn2, col_btn3, col_btn4, col_btn5 = st.columns(5)
+                    
+                    with col_btn1:
+                        if st.button("Up", key=f"up_{idx}", disabled=(idx == 0)):
+                            st.session_state.pipeline[idx], st.session_state.pipeline[idx-1] = \
+                                st.session_state.pipeline[idx-1], st.session_state.pipeline[idx]
+                            for i, n in enumerate(st.session_state.pipeline):
+                                n['id'] = f"node_{i}"
+                            st.rerun()
+                    
+                    with col_btn2:
+                        if st.button("Down", key=f"down_{idx}", disabled=(idx == len(st.session_state.pipeline)-1)):
+                            st.session_state.pipeline[idx], st.session_state.pipeline[idx+1] = \
+                                st.session_state.pipeline[idx+1], st.session_state.pipeline[idx]
+                            for i, n in enumerate(st.session_state.pipeline):
+                                n['id'] = f"node_{i}"
+                            st.rerun()
+                    
+                    with col_btn3:
+                        move_to = st.number_input("Move to", min_value=0, max_value=len(st.session_state.pipeline)-1, value=idx, key=f"moveto_{idx}", label_visibility="collapsed")
+                        if move_to != idx and st.button("GO", key=f"move_{idx}"):
+                            node_to_move = st.session_state.pipeline.pop(idx)
+                            st.session_state.pipeline.insert(move_to, node_to_move)
+                            for i, n in enumerate(st.session_state.pipeline):
+                                n['id'] = f"node_{i}"
+                            st.rerun()
+                    
+                    with col_btn4:
+                        skip_label = "Enable" if not is_enabled else "Skip"
+                        if st.button(skip_label, key=f"skip_{idx}"):
+                            st.session_state.pipeline[idx]['_enabled'] = not is_enabled
+                            st.rerun()
+                    
+                    with col_btn5:
+                        if st.button("Delete", key=f"del_{idx}"):
+                            st.session_state.pipeline.pop(idx)
+                            for i, n in enumerate(st.session_state.pipeline):
+                                n['id'] = f"node_{i}"
+                            st.rerun()
+                    
+                    st.divider()
+                    
+                    st.caption(f"類別: {node.get('category', 'N/A')}")
+                    st.caption(f"函數: {node.get('function', 'N/A')}")
+                    st.caption(f"狀態: {'啟用' if is_enabled else '已停用'}")
+                    
+                    st.markdown("**FPGA 時脈估計**")
+                    
+                    current_clk = fpga.get('estimated_clk', 0)
+                    new_clk = st.number_input(
+                        "CLK (Auto-calculated)",
+                        min_value=0,
+                        value=current_clk,
+                        disabled=True, # Lock explicit edit if we use formulas, but maybe allow override?
+                        key=f"clk_{node_id}"
+                    )
+                    if 'clk_formula' in fpga:
+                        st.caption(f"Formula: `{fpga['clk_formula']}`")
+                    
+                    st.caption(f"資源: {fpga.get('resource_usage', 'Unknown')}")
+                    st.caption(f"延遲: {fpga.get('latency_type', 'Unknown')}")
+                    
+                    # Render Parameters using Component
+                    render_parameter_editor(node, idx, node_id)
+                    
+                    if '_warning' in node:
+                        st.warning(node['_warning'])
+        
+        st.divider()
+        
+        st.subheader("4. Project Management")
+        
+        with st.expander("Export Project", expanded=False):
+            st.caption("確保所有調整過的參數都會被保存")
+            
+            export_author = st.text_input("作者", placeholder="學號/姓名", key="export_author")
+            export_notes = st.text_area("備註", placeholder="說明此Pipeline的用途", height=80, key="export_notes")
+            export_project_name = st.text_input("專案名稱", placeholder="例如：硬幣偵測_V1", key="export_project_name")
+            
+            if st.session_state.pipeline:
+                json_str = ProjectManager.export_project_to_json(
+                    st.session_state.pipeline,
+                    author=export_author or "Unknown",
+                    notes=export_notes,
+                    project_name=export_project_name or "Untitled_Project"
+                )
+                
+                filename = ProjectManager.generate_project_filename(export_author or "Unknown")
+                
+                col_dl1, col_dl2 = st.columns(2)
+                
+                with col_dl1:
+                    st.download_button(
+                        label="Download JSON",
+                        data=json_str,
+                        file_name=filename,
+                        mime="application/json",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                
+                with col_dl2:
+                    if st.button("Save to Folder", use_container_width=True):
+                        try:
+                            save_path = f"e:/LAB_DATA/ORB/experiments/05_AoV_Tool/{filename}"
+                            with open(save_path, 'w', encoding='utf-8') as f:
+                                f.write(json_str)
+                            st.success(f"已儲存: {filename}")
+                        except Exception as e:
+                            st.error(f"儲存失敗: {e}")
+                
+                st.markdown("### Code Generation")
+                tab_py, tab_vhdl, tab_verilog = st.tabs(["Python", "VHDL", "Verilog"])
+                
+                with tab_py:
+                    py_code = CodeGenerator.generate_python_script(st.session_state.pipeline)
+                    st.code(py_code, language="python")
+                    st.download_button("Download Python", py_code, "pipeline.py")
+                    
+                with tab_vhdl:
+                    vhdl_code = CodeGenerator.generate_vhdl(st.session_state.pipeline)
+                    st.code(vhdl_code, language="vhdl")
+                    st.download_button("Download VHDL", vhdl_code, "pipeline.vhd")
+
+                with tab_verilog:
+                    verilog_code = CodeGenerator.generate_verilog(st.session_state.pipeline)
+                    st.code(verilog_code, language="verilog")
+                    st.download_button("Download Verilog", verilog_code, "pipeline.v")
+            else:
+                st.info("請先產生 Pipeline")
+        
+        with st.expander("Import Project", expanded=False):
+            uploaded_project = st.file_uploader(
+                "選擇檔案",
+                type=['json', 'dot', 'txt', 'md'],
+                key="project_uploader"
+            )
+            
+            if uploaded_project is not None:
+                try:
+                    json_content = uploaded_project.read().decode('utf-8')
+                    file_extension = uploaded_project.name.split('.')[-1].lower()
+                    
+                    if file_extension == 'json':
+                        result = ProjectManager.load_project_from_json(json_content)
+                        if result["success"]:
+                            if st.button("Load Project", type="primary", use_container_width=True, key="load_project_btn"):
+                                st.session_state.pipeline = result["pipeline"]
+                                st.session_state.processed_image = None
+                                
+                                if st.session_state.uploaded_image is not None:
+                                    h, w = st.session_state.uploaded_image.shape[:2]
+                                    engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                    
+                                st.success("載入成功")
+                                st.rerun()
+                        else:
+                            st.error(f"失敗: {result['error']}")
+                    # Simplified for brevity - import parser logic remains same
+                except Exception as e:
+                    st.error(f"錯誤: {str(e)}")
+        
+        st.divider()
+        
+        if st.session_state.pipeline and (st.session_state.uploaded_image is not None or st.session_state.get('is_video')):
+            if st.button("Run Pipeline", type="primary", use_container_width=True):
+                with st.spinner("Processing..."):
+                    try:
+                        active_pipeline = [n for n in st.session_state.pipeline if n.get('_enabled', True)]
+                        
+                        if st.session_state.get('is_video'):
+                            # Video Execution
+                            output_path = "temp_output.mp4"
+                            stats = processor.process_video(
+                                st.session_state.video_path,
+                                output_path,
                                 active_pipeline
                             )
-                            st.session_state.processed_image = result
-                            st.success("Complete")
+                            st.session_state.processed_video_path = output_path
+                            st.success(f"Video Complete: {stats['resolution']} @ {stats['fps']}fps")
                         else:
-                            st.error("No image uploaded")
-                        
-                except Exception as e:
-                    st.error(f"Failed: {e}")
+                            # Image Execution
+                            if st.session_state.uploaded_image is not None:
+                                result = processor.execute_pipeline(
+                                    st.session_state.uploaded_image,
+                                    active_pipeline
+                                )
+                                st.session_state.processed_image = result
+                                st.success("Complete")
+                            else:
+                                st.error("No image uploaded")
+                            
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
 
+    # ----------------- Tab 2: Knowledge Base -----------------
+    with tab_kb:
+        st.subheader("知識庫中心")
+        st.caption("在這裡尋找靈感，或貢獻您的解決方案。")
+        
+        tab_text, tab_img, tab_tree, tab_contribute = st.tabs(["文字搜尋", "以圖搜圖", "知識樹瀏覽", "貢獻案例"])
+        
+        # Tab 1: Text Search (No Image Required)
+        with tab_text:
+            search_query = st.text_input("輸入需求關鍵字", placeholder="例如: 偵測硬幣, 去除雜訊...", key="kb_text_search")
+            if st.button("搜尋方案", key="btn_text_search"):
+                if search_query:
+                    with st.spinner(f"正在搜尋 '{search_query}'..."):
+                        matches = kb.find_similar_cases_by_text(search_query, top_k=3)
+                        
+                    if matches:
+                        st.success(f"找到 {len(matches)} 個相關案例")
+                        for i, (case, score) in enumerate(matches):
+                            with st.container():
+                                c1, c2 = st.columns([3, 1])
+                                with c1:
+                                    st.markdown(f"**方案 {chr(65+i)}**: {case.get('description', '未命名')}")
+                                    st.caption(f"相似度: {score:.2f}")
+                                    st.code(" -> ".join([n['name'] for n in case['pipeline']]), language="text")
+                                with c2:
+                                    if st.button("載入", key=f"load_text_{i}"):
+                                        st.session_state.pipeline = case['pipeline']
+                                        # Only recalc if image exists
+                                        if st.session_state.uploaded_image is not None:
+                                            h, w = st.session_state.uploaded_image.shape[:2]
+                                            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                        st.success("已載入")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                                st.divider()
+                    else:
+                        st.info("無相關結果。")
+                else:
+                    st.warning("請輸入關鍵字")
+        
+        # Tab 2: Image Search (Needs Image)
+        with tab_img:
+            if st.session_state.uploaded_image is not None:
+                if st.button("分析目前圖片"):
+                    matches = kb.find_similar_cases(st.session_state.uploaded_image)
+                    if matches:
+                        st.success(f"找到 {len(matches)} 個相似案例")
+                        for i, (case, score) in enumerate(matches):
+                                with st.container():
+                                    st.markdown(f"**方案 {chr(65+i)}** ({score:.2f})")
+                                    st.caption(case.get('description', ''))
+                                    st.code(" -> ".join([n['name'] for n in case['pipeline']]), language="text")
+                                    if st.button("套用此方案", key=f"apply_img_{i}"):
+                                        st.session_state.pipeline = case['pipeline']
+                                        h, w = st.session_state.uploaded_image.shape[:2]
+                                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                        st.success("已套用")
+                                        st.rerun()
+                                    st.divider()
+                    else:
+                        st.info("無相似案例。")
+            else:
+                st.info("請先上傳圖片才能使用此功能。")
+
+        # Tab 3: Knowledge Tree (UI Branch Tree)
+        with tab_tree:
+            st.markdown("### 📂 知識庫分類樹")
+            st.caption("依據演算法成分檢視案例")
+            
+            # Category Translation Map
+            CATEGORY_MAP = {
+                "detection": "物件偵測 (Detection)",
+                "preprocessing": "前處理 (Preprocessing)",
+                "edge_detection": "邊緣檢測 (Edge)",
+                "filtering": "濾波與降噪 (Filtering)",
+                "morphology": "形態學 (Morphology)",
+                "geometric": "幾何變換 (Geometric)",
+                "thresholding": "二值化 (Thresholding)",
+                "color": "色彩處理 (Color)",
+                "feature_detection": "特徵提取 (Feature)",
+                "arithmetic": "算術運算 (Arithmetic)",
+                "enhancement": "影像增強 (Enhancement)",
+                "analysis": "影像分析 (Analysis)",
+                "shape_detection": "形狀檢測 (Shape)",
+                "segmentation": "影像分割 (Segmentation)",
+                "motion_analysis": "動態分析 (Motion)",
+                "unknown": "未分類 (Unknown)",
+                "Other": "其他 (Other)"
+            }
+
+            # Build Tree Data
+            # Structure: Category -> Algorithm -> Cases
+            tree_data = {}
+            all_cases = kb.db
+            
+            if not all_cases:
+                st.info("知識庫目前為空。")
+            else:
+                for case in all_cases:
+                    case_id = case.get('id', 'unknown')
+                    desc = case.get('description', 'Untitled')
+                    pipeline = case.get('pipeline', [])
+                    
+                    # Extract algorithms used
+                    for node in pipeline:
+                        func_name = node.get('function')
+                        node_name = node.get('name')
+                        
+                        # Lookup Category in Library Manager
+                        # We use engine.lib_manager if available, else infer
+                        algo_info = engine.lib_manager.get_algorithm(func_name, 'official')
+                        if not algo_info:
+                            algo_info = engine.lib_manager.get_algorithm(func_name, 'contributed')
+                            
+                        raw_category = algo_info.get('category', 'Other') if algo_info else 'Other'
+                        
+                        # Translate Category
+                        category_zh = CATEGORY_MAP.get(raw_category, raw_category.title())
+
+                        if category_zh not in tree_data:
+                            tree_data[category_zh] = {}
+                        if node_name not in tree_data[category_zh]:
+                            tree_data[category_zh][node_name] = []
+                        
+                        # Avoid duplicates per algo branch
+                        exists = any(c['id'] == case_id for c in tree_data[category_zh][node_name])
+                        if not exists:
+                            tree_data[category_zh][node_name].append({
+                                'id': case_id,
+                                'desc': desc,
+                                'pipeline': pipeline
+                            })
+                
+                # --- Visual D3 Tree ---
+                d3_data = {"name": "Knowledge Base", "children": []}
+                for cat_name in sorted(tree_data.keys()):
+                    cat_node = {"name": cat_name, "children": []}
+                    for algo_name in sorted(tree_data[cat_name].keys()):
+                        algo_node = {"name": algo_name, "children": []}
+                        for case in tree_data[cat_name][algo_name]:
+                            # Leaf node
+                            algo_node["children"].append({"name": case['desc'][:20]+"..."}) # Truncate for display
+                        cat_node["children"].append(algo_node)
+                    d3_data["children"].append(cat_node)
+                
+                # Button to trigger Modal/Dialog
+                if st.button("過去經驗 ", use_container_width=True):
+                    @st.dialog("過去經驗 (Past Experience Tree)", width="large")
+                    def show_tree_dialog():
+                        st.caption("互動式探索：點擊節點展開/收合")
+                        render_d3_tree(d3_data, height=700)
+                    show_tree_dialog()
+
+                st.divider()
+
+                # Render List Tree with Delete Button
+                for cat_name in sorted(tree_data.keys()):
+                    with st.expander(f"📁 {cat_name} ({len(tree_data[cat_name])} 類演算法)", expanded=False):
+                        for algo_name in sorted(tree_data[cat_name].keys()):
+                            cases = tree_data[cat_name][algo_name]
+                            st.markdown(f"**└─ 🧩 {algo_name}** ({len(cases)} 案例)")
+                            
+                            for case in cases:
+                                c1, c2, c3 = st.columns([4, 1, 1])
+                                with c1:
+                                    st.text(f"   📄 {case['desc']}")
+                                with c2:
+                                    if st.button("Load", key=f"load_tree_{cat_name}_{algo_name}_{case['id']}"):
+                                        st.session_state.pipeline = case['pipeline']
+                                        if st.session_state.uploaded_image is not None:
+                                            h, w = st.session_state.uploaded_image.shape[:2]
+                                            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                        st.success("Loaded")
+                                        st.rerun()
+                                with c3:
+                                    # Delete Button
+                                    if st.button("🗑️", key=f"del_tree_{cat_name}_{algo_name}_{case['id']}", help="刪除此案例"):
+                                        if kb.delete_case(case['id']):
+                                            st.success(f"已刪除 {case['id']}")
+                                            time.sleep(0.5)
+                                            st.rerun()
+                                        else:
+                                            st.error("刪除失敗")
+
+        # Tab 4: Contribute (Needs Image + Pipeline)
+        with tab_contribute:
+            if st.session_state.uploaded_image is not None and st.session_state.pipeline:
+                desc = st.text_input("案例描述", placeholder="例如: 針對強反光的硬幣偵測", key="contrib_desc")
+                if st.button("保存至知識庫"):
+                    if desc:
+                        # Save logic
+                        timestamp = int(time.time())
+                        save_path = f"uploads/case_{timestamp}.jpg"
+                        try:
+                            os.makedirs("uploads", exist_ok=True)
+                            cv2.imwrite(save_path, st.session_state.uploaded_image)
+                            kb.add_case(save_path, st.session_state.pipeline, desc)
+                            st.success("已保存")
+                        except Exception as e:
+                            st.error(f"保存失敗: {e}")
+                    else:
+                        st.error("請輸入描述")
+            else:
+                st.info("請先上傳圖片並建立 Pipeline 才能貢獻。")
 
 with col_right:
     st.header("視覺化預覽")

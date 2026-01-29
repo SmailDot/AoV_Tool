@@ -1,9 +1,8 @@
-```mermaid
 graph TD
     %% 節點定義
     User([使用者])
     
-    subgraph Frontend [前端介面 (Streamlit UI)]
+    subgraph Frontend [前端介面 - Streamlit UI]
         UI_Input[影像上傳 & 文字指令]
         UI_Editor[節點編輯器 UI]
         UI_Viz[Pipeline 視覺化流程圖]
@@ -11,8 +10,8 @@ graph TD
     end
 
     subgraph Core_Logic [後端核心]
-        Logic[邏輯引擎<br/>(指令解析)]
-        Processor[影像處理器<br/>(OpenCV 執行)]
+        Logic[邏輯引擎<br/>指令解析]
+        Processor[影像處理器<br/>OpenCV 執行]
         LibMgr[函式庫管理器]
         ProjMgr[專案管理器]
     end
@@ -24,8 +23,8 @@ graph TD
     end
 
     subgraph Intelligence [AI 模組]
-        AutoTuner[自動調參器<br/>(遺傳演算法)]
-        KB_Engine[知識庫引擎<br/>(CLIP + FAISS)]
+        AutoTuner[自動調參器<br/>遺傳演算法]
+        KB_Engine[知識庫引擎<br/>CLIP + FAISS]
     end
 
     %% 資料流向
@@ -44,16 +43,16 @@ graph TD
     
     %% 視覺化流程
     UI_Editor -->|更新圖表數據| UI_Viz
-    UI_Viz -->|渲染 Graphviz 圖| User
+    UI_Viz -.->|渲染| User
     
     %% AI 智慧流程
-    User -->|智慧推薦 (Smart Suggest)| KB_Engine
+    User -->|智慧推薦| KB_Engine
     KB_Engine -->|向量搜尋| KB_DB
-    KB_Engine -->|回傳相似案例| UI_Editor
+    KB_Engine -->|相似案例| UI_Editor
     
     User -->|最佳化參數| AutoTuner
-    AutoTuner -->|迭代測試參數| Processor
-    AutoTuner -->|回傳最佳參數| UI_Editor
+    AutoTuner -->|迭代測試| Processor
+    AutoTuner -->|最佳參數| UI_Editor
     
     %% 專案管理
     UI_Editor -->|匯出專案| ProjMgr
@@ -71,4 +70,3 @@ graph TD
     class Logic,Processor,LibMgr,ProjMgr logic;
     class TechLib,KB_DB,Images data;
     class AutoTuner,KB_Engine ai;
-```

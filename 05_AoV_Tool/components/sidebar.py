@@ -119,10 +119,10 @@ def render_sidebar(engine):
                 with st.spinner("Testing connection..."):
                     is_ok, msg = engine.prompt_master.test_connection(api_key, base_url, final_model_name)
                     if is_ok:
-                        st.toast("Connection Successful", icon="✅")
+                        st.toast("Connection Successful")
                         st.success(f"Connection Verified\n\n- URL: OK\n- Key: OK\n- Model: {final_model_name}")
                     else:
-                        st.toast("Connection Failed", icon="❌")
+                        st.toast("Connection Failed")
                         st.error(f"Connection Failed\n\n{msg}")
 
             # Save to Session State

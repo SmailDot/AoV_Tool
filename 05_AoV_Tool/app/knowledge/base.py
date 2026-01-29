@@ -92,6 +92,30 @@ class KnowledgeBase:
         
         print(f"[KnowledgeBase] Saved case {case_id}: {description}")
 
+    def delete_case(self, case_id: str) -> bool:
+        """
+        刪除一個案例
+        """
+        try:
+            # Filter DB
+            original_len = len(self.db)
+            self.db = [entry for entry in self.db if entry['id'] != case_id]
+            
+            if len(self.db) == original_len:
+                print(f"[KnowledgeBase] Case {case_id} not found.")
+                return False
+                
+            self.save_db()
+            
+            # Rebuild Index (Simpler than deletion in FAISS Flat Index)
+            self._build_index()
+            
+            print(f"[KnowledgeBase] Deleted case {case_id}")
+            return True
+        except Exception as e:
+            print(f"[Error] Failed to delete case {case_id}: {e}")
+            return False
+
     def find_similar_cases(self, image_path: Union[str, np.ndarray], top_k: int = 3) -> List[Tuple[Dict, float]]:
         """
         以圖搜圖：找到最像的案例 (使用 FAISS)
@@ -118,6 +142,50 @@ class KnowledgeBase:
                 results.append((self.db[idx], float(score)))
             
         return results
+
+    def find_similar_cases_by_text(self, text_query: str, top_k: int = 5) -> List[Tuple[Dict, float]]:
+        """
+        以文搜圖：使用文字描述搜尋最像的案例 (Cross-Modal Search)
+        """
+        if not self.db or self.index.ntotal == 0:
+            return []
+            
+        # 1. 提取文字特徵
+        text_features = self._extract_text_features(text_query)
+        if text_features is None:
+            return []
+            
+        # 2. 搜尋 (FAISS)
+        query_vec = text_features.astype(np.float32).reshape(1, -1)
+        faiss.normalize_L2(query_vec)
+        
+        # Ensure k doesn't exceed total vectors
+        k = min(top_k, self.index.ntotal)
+        scores, indices = self.index.search(query_vec, k)
+        
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx != -1:
+                results.append((self.db[idx], float(score)))
+            
+        return results
+
+    def _extract_text_features(self, text: str) -> Optional[np.ndarray]:
+        """
+        使用 CLIP 提取文字特徵向量
+        """
+        try:
+            # Tokenize text (truncate=True to handle long text)
+            text_tokens = clip.tokenize([text], truncate=True).to(self.device)
+            
+            with torch.no_grad():
+                features = self.model.encode_text(text_tokens)
+                
+            return features.cpu().numpy()[0]
+            
+        except Exception as e:
+            print(f"[Error] CLIP text feature extraction failed: {e}")
+            return None
 
     def _extract_features(self, image_input) -> Optional[np.ndarray]:
         """

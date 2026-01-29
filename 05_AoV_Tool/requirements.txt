@@ -12,6 +12,11 @@ pillow>=12.1.0
 graphviz>=0.21
 pyvis>=0.3.2
 
-# Optional: LLM Integration (if using real API)
-# openai>=1.0.0
-# anthropic>=0.18.0
+# Knowledge Base / RAG
+faiss-cpu>=1.7.4
+git+https://github.com/openai/CLIP.git
+torch>=2.0.0
+torchvision>=0.15.0
+ftfy
+regex
+tqdm

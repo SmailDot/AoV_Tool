@@ -1,7 +1,7 @@
 # AI_GUIDE.md - Agent Handoff Protocol
 
-> **Version**: 2.0 (Knowledge-Driven Edition)
-> **Last Updated**: 2026-01-24
+> **Version**: 2.1 (Knowledge-Driven Edition + Interactive Experience)
+> **Last Updated**: 2026-01-30
 > **Status**: Production Ready
 
 ## 1. Project Identity
@@ -16,6 +16,8 @@
 - **Key Components**:
   - `components/node_editor.py`: Parameter editing (Auto-generated UI).
   - `components/visualizer.py`: Graphviz pipeline visualization.
+  - `components/knowledge_tree.py`: **[New]** D3.js animated tree visualization for knowledge base exploration.
+  - `components/sidebar.py`: Settings and navigation.
 
 ### Backend (Logic & Processing)
 - **Brain**: `logic_engine.py` (LLM Orchestration & Prompt Engineering).
@@ -34,6 +36,11 @@
     -   **Tech**: **Multimodal RAG** (CLIP + FAISS).
     -   **Flow**: Image -> CLIP Embedding -> FAISS Vector Search -> Top-k Similar Cases.
     -   **Files**: `base.py` (Core Logic), `knowledge_db.json` (Metadata).
+    -   **Features**:
+        -   **Text Search**: Natural language query.
+        -   **Image Search**: Visual similarity (CLIP).
+        -   **Knowledge Tree**: **[New]** Interactive D3.js visualization of algorithm hierarchy (Category -> Algorithm -> Cases).
+        -   **Management**: **[New]** Delete capabilities for maintaining data quality.
 
 ## 3. Key Features & Workflows
 
@@ -47,11 +54,15 @@
     -   Structural Mutation tries to Add/Remove nodes (e.g., adding `Dilate` to fill holes).
     -   **Safety**: Resizes are locked to aspect ratio to prevent distortion.
 
-### C. Knowledge Retrieval (Smart Suggest)
-- **Input**: New Image.
-- **Action**: Click "Smart Suggest".
-- **Backend**: CLIP extracts visual features -> Searches FAISS DB.
-- **Output**: Recommends pipelines from similar historical cases (e.g., "This looks like the 'Metal Scratch' case").
+### C. Knowledge Retrieval & Exploration
+- **Smart Suggest**:
+    -   **Input**: New Image.
+    -   **Backend**: CLIP extracts visual features -> Searches FAISS DB.
+    -   **Output**: Recommends pipelines from similar historical cases.
+- **Knowledge Tree (Visual Explorer)**:
+    -   **UI**: Full-screen interactive modal.
+    -   **Tech**: D3.js Collapsible Tree.
+    -   **Goal**: Explore "What algorithms are used for what cases?" from a structural perspective.
 
 ## 4. Maintenance & known Issues
 
@@ -65,6 +76,7 @@
 1.  **Streamlit State**: `st.session_state` is volatile. Always ensure state sync when modifying backend objects (like AutoTuner does).
 2.  **OpenCV Types**: `st.number_input` crashes if given `numpy.int`. Always cast to `int()` or `float()` in UI code.
 3.  **Resize Distortion**: `cv2.resize` with fixed W/H destroys aspect ratio. Use the `op_resize` in `basic.py` which handles `0` as "Auto".
+4.  **D3.js Integration**: The `knowledge_tree.py` uses `st.components.v1.html`. Remember to escape Python f-strings with `{{}}` when writing JS template literals.
 
 ### Roadmap (Future Agents)
 - [ ] **Cloud Storage**: Move `knowledge_db.json` and images to Google Cloud Storage (GCS) for team sharing.
