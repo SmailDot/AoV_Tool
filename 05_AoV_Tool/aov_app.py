@@ -126,7 +126,7 @@ with col_left:
                 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 
                 # ================= Auto-Tune (File Upload Mode) =================
-                enable_tuning = st.checkbox("啟用目標驅動優化 (Auto-Tune) (無需 API Key)", value=False)
+                enable_tuning = st.checkbox("啟用目標驅動優化 (Auto-Tune)", value=False)
                 
                 if enable_tuning:
                     st.info("請上傳一張與原圖大小相同的「目標遮罩 (Ground Truth Mask)」。\n(黑白圖片，白色代表目標區域)")
@@ -388,50 +388,53 @@ with col_left:
 
         st.divider()
         
+        # Show Pipeline Editor section regardless of whether pipeline has nodes
+        # This ensures Add Node functionality is always available
+        st.subheader("3. Pipeline Editor")
+        
+        # ========== 新增節點功能 (Always visible) ==========
+        with st.expander("Add Node", expanded=False):
+            all_algos = engine.lib_manager.list_algorithms()
+            
+            algo_options = {}
+            for a in all_algos:
+                cn_name = a.get('name_zh', a['name'])
+                display_name = f"{a['name']} / {cn_name} ({a['category']})"
+                algo_options[display_name] = a
+            
+            selected_algo_name = st.selectbox("選擇演算法", list(algo_options.keys()), key="new_algo_select")
+            insert_position = st.number_input("插入位置", min_value=0, max_value=len(st.session_state.pipeline), value=len(st.session_state.pipeline), key="insert_pos")
+            
+            if st.button("Add Node", type="primary", use_container_width=True):
+                algo_data = algo_options[selected_algo_name]
+                algo_id = algo_data['_algo_id']
+                
+                new_node = {
+                    'id': f'node_{insert_position}',
+                    'name': algo_data['name'],
+                    'function': algo_data.get('opencv_function', algo_id),
+                    'category': algo_data['category'],
+                    'description': algo_data.get('description', ''),
+                    'parameters': algo_data.get('parameters', {}).copy(),
+                    'fpga_constraints': algo_data['fpga_constraints'].copy(),
+                    'source': 'manual_add',
+                    '_enabled': True
+                }
+                
+                st.session_state.pipeline.insert(insert_position, new_node)
+                
+                for i, n in enumerate(st.session_state.pipeline):
+                    n['id'] = f"node_{i}"
+                
+                if st.session_state.uploaded_image is not None:
+                    h, w = st.session_state.uploaded_image.shape[:2]
+                    engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                    
+                st.success(f"已新增 {algo_data['name']}")
+                st.rerun()
+        
+        # Only show node list if there are nodes
         if st.session_state.pipeline:
-            st.subheader("3. Pipeline Editor")
-            
-            # ========== 新增節點功能 ==========
-            with st.expander("Add Node", expanded=False):
-                all_algos = engine.lib_manager.list_algorithms()
-                
-                algo_options = {}
-                for a in all_algos:
-                    cn_name = a.get('name_zh', a['name'])
-                    display_name = f"{a['name']} / {cn_name} ({a['category']})"
-                    algo_options[display_name] = a
-                
-                selected_algo_name = st.selectbox("選擇演算法", list(algo_options.keys()), key="new_algo_select")
-                insert_position = st.number_input("插入位置", min_value=0, max_value=len(st.session_state.pipeline), value=len(st.session_state.pipeline), key="insert_pos")
-                
-                if st.button("Add Node", type="primary", use_container_width=True):
-                    algo_data = algo_options[selected_algo_name]
-                    algo_id = algo_data['_algo_id']
-                    
-                    new_node = {
-                        'id': f'node_{insert_position}',
-                        'name': algo_data['name'],
-                        'function': algo_data.get('opencv_function', algo_id),
-                        'category': algo_data['category'],
-                        'description': algo_data.get('description', ''),
-                        'parameters': algo_data.get('parameters', {}).copy(),
-                        'fpga_constraints': algo_data['fpga_constraints'].copy(),
-                        'source': 'manual_add',
-                        '_enabled': True
-                    }
-                    
-                    st.session_state.pipeline.insert(insert_position, new_node)
-                    
-                    for i, n in enumerate(st.session_state.pipeline):
-                        n['id'] = f"node_{i}"
-                    
-                    if st.session_state.uploaded_image is not None:
-                        h, w = st.session_state.uploaded_image.shape[:2]
-                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                        
-                    st.success(f"已新增 {algo_data['name']}")
-                    st.rerun()
-            
             for idx, node in enumerate(st.session_state.pipeline):
                 node_id = node.get('id', f'node_{idx}')
                 node_name = node.get('name', '未知節點')
@@ -780,12 +783,23 @@ with col_left:
                     d3_data["children"].append(cat_node)
                 
                 # Button to trigger Modal/Dialog
-                if st.button("過去經驗 ", use_container_width=True):
+                # Initialize session state for dialog control
+                if "show_past_exp_dialog" not in st.session_state:
+                    st.session_state.show_past_exp_dialog = False
+                
+                # Use a unique key for the button to prevent state conflicts
+                if st.button("過去經驗 ", use_container_width=True, key="btn_past_exp_dialog"):
+                    st.session_state.show_past_exp_dialog = True
+                
+                # Show dialog independently of button click to maintain tab state
+                if st.session_state.show_past_exp_dialog:
                     @st.dialog("過去經驗 (Past Experience Tree)", width="large")
                     def show_tree_dialog():
                         st.caption("互動式探索：點擊節點展開/收合")
                         render_d3_tree(d3_data, height=700)
                     show_tree_dialog()
+                    # Reset the flag after dialog is shown
+                    st.session_state.show_past_exp_dialog = False
 
                 st.divider()
 
