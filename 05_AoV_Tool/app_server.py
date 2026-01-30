@@ -250,8 +250,42 @@ def list_algorithms():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def start_ngrok(port: int) -> str | None:
+    """Start ngrok tunnel and return public URL"""
+    try:
+        from pyngrok import ngrok
+        
+        # Check if authtoken is configured
+        # You can set it via: ngrok config add-authtoken <token>
+        # Or set environment variable: NGROK_AUTHTOKEN
+        
+        public_url = ngrok.connect(str(port), bind_tls=True).public_url
+        print("=" * 60)
+        print("🌐 NGROK TUNNEL ACTIVE")
+        print("=" * 60)
+        print(f"📡 Public URL: {public_url}")
+        print(f"📡 Health Check: {public_url}/health")
+        print(f"📡 Process API: {public_url}/process")
+        print("=" * 60)
+        return public_url
+    except ImportError:
+        print("[Warning] pyngrok not installed. Run: pip install pyngrok")
+        print("[Warning] Server will only be accessible locally.")
+        return None
+    except Exception as e:
+        print(f"[Warning] ngrok failed to start: {e}")
+        print("[Warning] Server will only be accessible locally.")
+        return None
+
+
 if __name__ == '__main__':
     # Run on 0.0.0.0 to be accessible from n8n (if in docker)
     port = int(os.environ.get('PORT', 5000))
+    
+    # Start ngrok tunnel for remote access
+    use_ngrok = os.environ.get('USE_NGROK', 'true').lower() == 'true'
+    if use_ngrok:
+        public_url = start_ngrok(port)
+    
     print(f"[Server] Starting on port {port}...")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)

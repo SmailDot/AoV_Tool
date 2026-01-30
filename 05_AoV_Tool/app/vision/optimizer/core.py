@@ -48,6 +48,7 @@ class AutoTuner:
         best_pipeline = deepcopy(initial_pipeline)
         
         # Initial Eval
+        result = image.copy()  # Initialize result to avoid unbound variable
         try:
             result = self.processor.execute_pipeline(image, best_pipeline, debug_mode=False)
             best_score = self.evaluator.calculate_score(result, target_mask)
@@ -237,15 +238,7 @@ class AutoTuner:
             print("[AutoTuner] No tunable parameters found.")
             return initial_pipeline, 0.0
 
-        # [NEW] Check for LLM Vision Feedback mode
-        if self.method == 'llm':
-             print("[AutoTuner] Using LLM Vision Feedback Strategy")
-             # Use a specialized loop for LLM feedback
-             return self._tune_with_llm(image, target_mask, best_pipeline, max_iterations, time_limit, target_score)
-            
         # [Fix] Pre-process Pipeline to remove Fixed Resize distortion
-        # ... (rest of the file)
-
         h_src, w_src = image.shape[:2]
         ar_src = w_src / (h_src + 1e-6)
         
@@ -294,6 +287,16 @@ class AutoTuner:
         
         stop_reason = "Max iterations reached"
         
+        # [NEW] Check for LLM Vision Feedback mode - handle before the loop
+        if self.method == 'llm':
+            print("[AutoTuner] Using LLM Vision Feedback Strategy")
+            return self._tune_with_llm(image, target_mask, best_pipeline, max_iterations, time_limit, target_score)
+        
+        # [Fix] Ensure strategy is not None for non-LLM methods
+        if self.strategy is None:
+            print("[AutoTuner] Error: No optimization strategy available.")
+            return best_pipeline, best_score
+        
         # 3. 優化迴圈
         for i in range(max_iterations):
             elapsed = time.time() - start_time
@@ -304,67 +307,55 @@ class AutoTuner:
                 
             progress_bar.progress((i + 1) / max_iterations)
             
-        if self.method == 'llm':
-            # This path is actually unreachable due to early return above, 
-            # but kept for safety/logic flow integrity if logic changes.
-            pass
-        else:
             # 更新參數
             current_tunable = self._extract_tunable_params(current_pipeline)
             candidate_pipeline = self.strategy.generate_candidate(current_pipeline, current_tunable, last_improved)
             
             # [Fix] Resize Protection
             # Ensure candidate pipeline doesn't introduce distortion via Resize nodes
-            # If width/height are set to fixed values that distort aspect ratio, reset them.
-            h_src, w_src = image.shape[:2]
-            ar_src = w_src / (h_src + 1e-6)
-            
             for node in candidate_pipeline:
-                 if 'resize' in node.get('name', '').lower():
-                     p = node.get('parameters', {})
-                     w = p.get('width', {}).get('default', 0)
-                     h = p.get('height', {}).get('default', 0)
-                     if w > 0 and h > 0:
-                         ar_node = w / (h + 1e-6)
-                         if abs(ar_node - ar_src) / ar_src > 0.05:
-                             # Distortion detected in candidate, force fix
-                             node['parameters']['height']['default'] = 0
+                if 'resize' in node.get('name', '').lower():
+                    p = node.get('parameters', {})
+                    w = p.get('width', {}).get('default', 0)
+                    h = p.get('height', {}).get('default', 0)
+                    if w > 0 and h > 0:
+                        ar_node = w / (h + 1e-6)
+                        if abs(ar_node - ar_src) / ar_src > 0.05:
+                            # Distortion detected in candidate, force fix
+                            node['parameters']['height']['default'] = 0
             
             # 執行與評估
             try:
-                # Debug: Print what we are running
-                # print(f"  [Iter {i}] Running pipeline...")
                 result = self.processor.execute_pipeline(image, candidate_pipeline, debug_mode=False)
                 score = self.evaluator.calculate_score(result, target_mask)
             except Exception as e:
-                # print(f"  [Iter {i}] Failed: {e}")
                 score = 0.0
-                    
-                # 更新狀態顯示
-                status_container.markdown(f"""
-                **Optimization Status**: Iteration {i+1}/{max_iterations}
-                - Current Best IoU: `{best_score:.4f}`
-                - Last Attempt IoU: `{score:.4f}`
-                - Time Elapsed: `{elapsed:.1f}s / {time_limit}s`
-                """)
+            
+            # 更新狀態顯示
+            status_container.markdown(f"""
+            **Optimization Status**: Iteration {i+1}/{max_iterations}
+            - Current Best IoU: `{best_score:.4f}`
+            - Last Attempt IoU: `{score:.4f}`
+            - Time Elapsed: `{elapsed:.1f}s / {time_limit}s`
+            """)
 
-                # 比較
-                if score > best_score:
-                    print(f"  [Iter {i}] New Best! Score: {score:.4f} (was {best_score:.4f})")
-                    best_score = score
-                    best_pipeline = candidate_pipeline
-                    current_pipeline = candidate_pipeline
-                    last_improved = True
-                    
-                    # Early Exit if Good Enough
-                    if best_score >= target_score:
-                        status_container.success(f"Reached Target Accuracy! ({best_score:.4f})")
-                        stop_reason = "Target accuracy reached"
-                        return best_pipeline, best_score
-                else:
-                    last_improved = False
-                    # GA/Hill Climbing Logic
-                    current_pipeline = best_pipeline
+            # 比較
+            if score > best_score:
+                print(f"  [Iter {i}] New Best! Score: {score:.4f} (was {best_score:.4f})")
+                best_score = score
+                best_pipeline = candidate_pipeline
+                current_pipeline = candidate_pipeline
+                last_improved = True
+                
+                # Early Exit if Good Enough
+                if best_score >= target_score:
+                    status_container.success(f"Reached Target Accuracy! ({best_score:.4f})")
+                    stop_reason = "Target accuracy reached"
+                    break
+            else:
+                last_improved = False
+                # GA/Hill Climbing Logic
+                current_pipeline = best_pipeline
             
         print(f"[AutoTuner] Optimization finished. Reason: {stop_reason}. Best Score: {best_score:.4f}")
         st.toast(f"優化結束: {stop_reason}", icon="🏁")

@@ -2,6 +2,7 @@
 streamlit>=1.52.0
 flask>=3.0.0
 streamlit-drawable-canvas>=0.9.3
+pyngrok>=7.0.0
 
 # Computer Vision
 opencv-python>=4.12.0

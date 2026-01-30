@@ -171,7 +171,10 @@ class PromptMaster:
                 temperature=0.2,
                 max_tokens=300
              )
-             raw = response.choices[0].message.content.strip()
+             raw = response.choices[0].message.content
+             if raw is None:
+                 return {"error": "LLM returned empty response"}
+             raw = raw.strip()
              if "```" in raw: raw = raw.replace("```json", "").replace("```", "").strip()
              return json.loads(raw)
 
@@ -274,7 +277,14 @@ class PromptMaster:
                 max_tokens=500
             )
             
-            raw_output = response.choices[0].message.content.strip()
+            raw_output = response.choices[0].message.content
+            if raw_output is None:
+                return {
+                    "pipeline": self._get_fallback_pipeline(user_query),
+                    "reasoning": "LLM 返回空回應，已切換至 Fallback 模式。",
+                    "error": None
+                }
+            raw_output = raw_output.strip()
             
             # Clean up markdown code blocks
             if "```" in raw_output:

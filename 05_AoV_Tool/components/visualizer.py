@@ -81,7 +81,9 @@ def render_pipeline_graph(pipeline):
                 current_id = current_node.get('id', f'node_{i}')
                 next_id = next_node.get('id', f'node_{i+1}')
                 
-                clk_label = f"{current_node['fpga_constraints'].get('estimated_clk', 0)} clk"            
+                # Safe access to fpga_constraints
+                fpga = current_node.get('fpga_constraints', {})
+                clk_label = f"{fpga.get('estimated_clk', 0)} clk"            
                 net.add_edge(current_id, next_id, label=clk_label, color='#1976D2', arrows='to',
                             font={'size': 12, 'face': 'Microsoft JhengHei'})
             
@@ -92,7 +94,7 @@ def render_pipeline_graph(pipeline):
                 
             components.html(html_content, height=620, scrolling=False)
             
-            total_clk = sum(n['fpga_constraints'].get('estimated_clk', 0) for n in pipeline)
+            total_clk = sum(n.get('fpga_constraints', {}).get('estimated_clk', 0) for n in pipeline)
             st.metric("總時脈", f"{total_clk} clk")
             
         except Exception as e:
