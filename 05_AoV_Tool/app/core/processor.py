@@ -88,6 +88,77 @@ class ImageProcessor:
             "HoughCircles": detect.op_hough_circles,
         }
 
+    def _normalize_func_name(self, func_name: str) -> str:
+        """
+        Normalize function name to match operation_map keys.
+        Handles cases like:
+        - "cv2.GaussianBlur" -> "gaussian_blur"
+        - "cv2.Canny" -> "canny_edge" (mapped)
+        - "GaussianBlur" -> "gaussian_blur"
+        """
+        if not func_name or func_name == 'Unknown':
+            return ''
+        
+        # Remove cv2. prefix
+        if func_name.startswith('cv2.'):
+            func_name = func_name[4:]
+        
+        # Direct match check
+        if func_name in self.operation_map:
+            return func_name
+        
+        # Try case-insensitive match
+        func_lower = func_name.lower()
+        for key in self.operation_map.keys():
+            if key.lower() == func_lower:
+                return key
+        
+        # Common name mappings (cv2 name -> our key)
+        cv2_mappings = {
+            'gaussianblur': 'gaussian_blur',
+            'medianblur': 'median_blur',
+            'canny': 'canny_edge',
+            'threshold': 'threshold_binary',
+            'adaptivethreshold': 'adaptive_threshold',
+            'bilateralfilter': 'bilateral_filter',
+            'boxfilter': 'box_filter',
+            'inrange': 'in_range',
+            'bitwisenot': 'bitwise_not',
+            'equalizehist': 'equalize_hist',
+            'dilate': 'dilate',
+            'erode': 'erode',
+            'morphologyex_open': 'morph_open',
+            'morphologyex_close': 'morph_close',
+            'morphologyex_gradient': 'morph_gradient',
+            'houghcircles': 'hough_circles',
+            'findcontours': 'find_contours',
+            'flip': 'flip',
+            'rotate': 'rotate',
+            'resize': 'resize',
+            'cvtcolor_bgr2gray': 'bgr2gray',
+            'cvtcolor_bgr2hsv': 'bgr2hsv',
+            'addweighted': 'addWeighted',
+            'add': 'add',
+            'bitwise_and': 'bitwise_and',
+            'bitwise_or': 'bitwise_or',
+            'bitwise_xor': 'bitwise_xor',
+            'absdiff': 'absdiff',
+        }
+        
+        if func_lower in cv2_mappings:
+            mapped = cv2_mappings[func_lower]
+            if mapped in self.operation_map:
+                return mapped
+        
+        # Try removing underscores and compare
+        func_compact = func_lower.replace('_', '')
+        if func_compact in cv2_mappings:
+            mapped = cv2_mappings[func_compact]
+            if mapped in self.operation_map:
+                return mapped
+        
+        return func_name
+
     def execute_pipeline(
         self, 
         image_bgr: np.ndarray, 
@@ -116,9 +187,12 @@ class ImageProcessor:
         for idx, node in enumerate(pipeline_json):
             node_id = node.get('id', f'node_{idx}')
             try:
-                func_name = node.get('function', node.get('name', 'Unknown'))
+                raw_func_name = node.get('function', node.get('name', 'Unknown'))
+                func_name = self._normalize_func_name(raw_func_name)
                 params = node.get('parameters', {})
                 input_ids = node.get('inputs', [])
+                
+                print(f"\n[{node_id}] {raw_func_name} -> {func_name} (Inputs: {input_ids})")
                 
                 print(f"\n[{node_id}] {func_name} (Inputs: {input_ids})")
                 
@@ -167,8 +241,10 @@ class ImageProcessor:
                     print(f"  [OK] Output shape: {output_image.shape}")
                     
                 else:
-                    print(f"  [WARN] Unknown operation '{func_name}'. Pass-through.")
-                    results_cache[node_id] = input_images[0].copy() if input_images else results_cache["source"]
+                    # [Fix] Unknown operation - raise error instead of silent pass-through
+                    error_msg = f"Unknown operation '{func_name}'. Not found in operation_map. Available operations: {list(self.operation_map.keys())[:10]}..."
+                    print(f"  [ERROR] {error_msg}")
+                    raise ValueError(error_msg)
                 
             except Exception as e:
                 print(f"  [ERROR] Node {node_id} failed: {e}")
