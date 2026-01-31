@@ -928,6 +928,20 @@ with col_right:
     
     st.subheader("處理結果")
     
+    # [Comparison] Save current result as reference for comparison
+    if st.session_state.processed_image is not None:
+        col_save, col_clear = st.columns([1, 1])
+        with col_save:
+            if st.button("📌 保存為對照", help="將目前結果保存，方便調整參數後對比", use_container_width=True):
+                st.session_state.reference_image = st.session_state.processed_image.copy()
+                st.toast("✅ 已保存為對照基準", icon="📌")
+        with col_clear:
+            if st.session_state.get('reference_image') is not None:
+                if st.button("🗑️ 清除對照", help="清除已保存的對照結果", use_container_width=True):
+                    del st.session_state.reference_image
+                    st.toast("🗑️ 對照基準已清除", icon="🗑️")
+                    st.rerun()
+    
     # Video Result Display
     if st.session_state.get('is_video') and st.session_state.get('processed_video_path'):
         st.video(st.session_state.processed_video_path)
@@ -936,16 +950,51 @@ with col_right:
             
     # Image Result Display
     elif st.session_state.processed_image is not None:
-        zoom_level = st.slider("縮放", 25, 200, 100, 25, format="%d%%")
-        result_rgb = cv2.cvtColor(st.session_state.processed_image, cv2.COLOR_BGR2RGB)
+        # Check if reference image exists for comparison
+        has_reference = st.session_state.get('reference_image') is not None
         
-        if zoom_level != 100:
-            h, w = result_rgb.shape[:2]
-            new_w = int(w * zoom_level / 100)
-            new_h = int(h * zoom_level / 100)
-            result_rgb = cv2.resize(result_rgb, (new_w, new_h))
-        
-        st.image(result_rgb, caption=f"({zoom_level}%)")
+        if has_reference:
+            # Show comparison view
+            st.markdown("**👁️ 對照模式**")
+            col_current, col_reference = st.columns(2)
+            
+            with col_current:
+                st.caption("🆕 目前結果")
+                zoom_current = st.slider("目前縮放", 25, 200, 100, 25, format="%d%%", key="zoom_current")
+                result_rgb = cv2.cvtColor(st.session_state.processed_image, cv2.COLOR_BGR2RGB)
+                
+                if zoom_current != 100:
+                    h, w = result_rgb.shape[:2]
+                    new_w = int(w * zoom_current / 100)
+                    new_h = int(h * zoom_current / 100)
+                    result_rgb = cv2.resize(result_rgb, (new_w, new_h))
+                
+                st.image(result_rgb, use_container_width=True)
+            
+            with col_reference:
+                st.caption("📌 對照基準")
+                zoom_ref = st.slider("對照縮放", 25, 200, 100, 25, format="%d%%", key="zoom_ref")
+                ref_rgb = cv2.cvtColor(st.session_state.reference_image, cv2.COLOR_BGR2RGB)
+                
+                if zoom_ref != 100:
+                    h, w = ref_rgb.shape[:2]
+                    new_w = int(w * zoom_ref / 100)
+                    new_h = int(h * zoom_ref / 100)
+                    ref_rgb = cv2.resize(ref_rgb, (new_w, new_h))
+                
+                st.image(ref_rgb, use_container_width=True)
+        else:
+            # Normal single view
+            zoom_level = st.slider("縮放", 25, 200, 100, 25, format="%d%%")
+            result_rgb = cv2.cvtColor(st.session_state.processed_image, cv2.COLOR_BGR2RGB)
+            
+            if zoom_level != 100:
+                h, w = result_rgb.shape[:2]
+                new_w = int(w * zoom_level / 100)
+                new_h = int(h * zoom_level / 100)
+                result_rgb = cv2.resize(result_rgb, (new_w, new_h))
+            
+            st.image(result_rgb, caption=f"({zoom_level}%)")
         
         is_success, buffer = cv2.imencode(".png", st.session_state.processed_image)
         if is_success:
