@@ -605,10 +605,14 @@ with col_left:
                 with col_dl2:
                     if st.button("Save to Folder", use_container_width=True):
                         try:
-                            save_path = f"e:/LAB_DATA/ORB/experiments/05_AoV_Tool/{filename}"
+                            import os
+                            save_dir = "e:/LAB_DATA/ORB/experiments/05_AoV_Tool"
+                            # [Fix] Auto-create directory if not exists
+                            os.makedirs(save_dir, exist_ok=True)
+                            save_path = os.path.join(save_dir, filename)
                             with open(save_path, 'w', encoding='utf-8') as f:
                                 f.write(json_str)
-                            st.success(f"已儲存: {filename}")
+                            st.success(f"✅ 已儲存: {save_path}")
                         except Exception as e:
                             st.error(f"儲存失敗: {e}")
                 
