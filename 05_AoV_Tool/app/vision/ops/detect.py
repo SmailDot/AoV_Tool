@@ -250,3 +250,37 @@ def op_hog_descriptor(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
     for (x, y, w, h) in regions:
         cv2.rectangle(output, (x, y), (x+w, y+h), (0, 255, 255), 2)
     return output
+
+def op_distance_transform(img: np.ndarray, params: Dict, debug: bool) -> np.ndarray:
+    """
+    距離變換 - 找出物體中心，輔助 Watershed 分離目標
+    """
+    gray = ensure_gray(img)
+    
+    # 二值化（確保輸入是二值圖）
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # 獲取參數
+    distance_type_str = params.get('distanceType', {}).get('default', 'DIST_L2')
+    mask_size = int(params.get('maskSize', {}).get('default', 5))
+    normalize = bool(params.get('normalize', {}).get('default', True))
+    
+    # 映射距離類型字串到 OpenCV 常數
+    distance_types = {
+        'DIST_L1': cv2.DIST_L1,
+        'DIST_L2': cv2.DIST_L2,
+        'DIST_C': cv2.DIST_C
+    }
+    distance_type = distance_types.get(distance_type_str, cv2.DIST_L2)
+    
+    # 執行距離變換
+    dist_transform = cv2.distanceTransform(binary, distance_type, mask_size)
+    
+    # 正規化到 [0, 255] 以便顯示
+    if normalize:
+        cv2.normalize(dist_transform, dist_transform, 0, 255, cv2.NORM_MINMAX)
+    
+    # 轉換為 8-bit 影像
+    dist_transform = np.uint8(dist_transform)
+    
+    return ensure_bgr(dist_transform)

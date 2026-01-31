@@ -710,17 +710,203 @@
                 "date_added": "2025-01-09",
                 "contributor_note": "此演算法在硬幣辨識專案中解決反光問題時被發現非常有效。",
                 "name_zh": "CLAHE增強"
+            },
+            "perspective_transform": {
+                "id": "cv_perspective_v1",
+                "name": "Perspective Transform",
+                "category": "geometric",
+                "description": "修正斜拍造成的變形，將橢圓還原為圓",
+                "opencv_function": "cv2.warpPerspective",
+                "parameters": {
+                    "src_points": {
+                        "type": "list",
+                        "default": [[100, 100], [400, 100], [400, 400], [100, 400]],
+                        "description": "原始四邊形頂點座標（左上、右上、右下、左下）"
+                    },
+                    "dst_points": {
+                        "type": "list",
+                        "default": [[0, 0], [300, 0], [300, 300], [0, 300]],
+                        "description": "目標四邊形頂點座標"
+                    },
+                    "dsize": {
+                        "type": "tuple",
+                        "default": [300, 300],
+                        "description": "輸出影像大小 (width, height)"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 2800,
+                    "resource_usage": "Medium",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 8,
+                    "lut_count": 12000,
+                    "bram_kb": 144,
+                    "notes": "需要儲存變換矩陣和進行雙線性插值。適用於修正斜拍硬幣。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-31",
+                "name_zh": "透視變換"
+            },
+            "watershed_segmentation": {
+                "id": "cv_watershed_v1",
+                "name": "Watershed Segmentation",
+                "category": "segmentation",
+                "description": "解決硬幣重疊、邊界模糊的終極手段",
+                "opencv_function": "cv2.watershed",
+                "parameters": {
+                    "use_markers": {
+                        "type": "bool",
+                        "default": true,
+                        "description": "是否使用標記點引導分割"
+                    },
+                    "marker_threshold": {
+                        "type": "int",
+                        "default": 127,
+                        "range": [0, 255],
+                        "description": "標記點閾值"
+                    },
+                    "min_marker_size": {
+                        "type": "int",
+                        "default": 10,
+                        "description": "最小標記區域大小"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 8500,
+                    "resource_usage": "High",
+                    "latency_type": "Iterative",
+                    "dsp_count": 2,
+                    "lut_count": 18000,
+                    "bram_kb": 256,
+                    "notes": "疊代式演算法，需要多次掃描影像。適合分離重疊硬幣。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-31",
+                "name_zh": "分水嶺分割"
+            },
+            "distance_transform": {
+                "id": "cv_dist_trans_v1",
+                "name": "Distance Transform",
+                "category": "analysis",
+                "description": "找出物體中心，輔助 Watershed 分離目標",
+                "opencv_function": "cv2.distanceTransform",
+                "parameters": {
+                    "distanceType": {
+                        "type": "string",
+                        "default": "DIST_L2",
+                        "enum": ["DIST_L1", "DIST_L2", "DIST_C"],
+                        "description": "距離度量類型 (L1=曼哈頓, L2=歐幾里得, C=切比雪夫)"
+                    },
+                    "maskSize": {
+                        "type": "int",
+                        "default": 5,
+                        "enum": [3, 5],
+                        "description": "距離變換遮罩大小"
+                    },
+                    "normalize": {
+                        "type": "bool",
+                        "default": true,
+                        "description": "是否正規化輸出到 [0,255]"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 1200,
+                    "resource_usage": "Medium",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 4,
+                    "lut_count": 8500,
+                    "bram_kb": 72,
+                    "notes": "兩遍掃描演算法。輸出灰度圖表示每個像素到背景的距離。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-31",
+                "name_zh": "距離變換"
+            },
+            "hu_moments": {
+                "id": "cv_hu_moments_v1",
+                "name": "Hu Moments",
+                "category": "feature_detection",
+                "description": "判斷形狀是否為圓形的低功耗指標",
+                "opencv_function": "cv2.HuMoments",
+                "parameters": {
+                    "contour_index": {
+                        "type": "int",
+                        "default": -1,
+                        "description": "處理第幾個輪廓 (-1=所有)"
+                    },
+                    "visualize": {
+                        "type": "bool",
+                        "default": true,
+                        "description": "是否顯示特徵標記"
+                    },
+                    "threshold_roundness": {
+                        "type": "float",
+                        "default": 0.9,
+                        "range": [0.0, 1.0],
+                        "description": "圓形判斷閾值"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 450,
+                    "resource_usage": "Low",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 2,
+                    "lut_count": 3500,
+                    "bram_kb": 18,
+                    "notes": "基於影像矩的形狀描述符，旋轉/縮放不變。Hu[0] 接近 0.16 表示圓形。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-31",
+                "name_zh": "Hu矩計算"
+            },
+            "fast_clahe": {
+                "id": "cv_fast_clahe_v2",
+                "name": "Fast CLAHE",
+                "category": "enhancement",
+                "description": "針對硬幣反光，比傳統 HistEqual 更穩定",
+                "opencv_function": "cv2.createCLAHE",
+                "parameters": {
+                    "clipLimit": {
+                        "type": "float",
+                        "default": 3.0,
+                        "range": [1.0, 10.0],
+                        "description": "對比度限制（越大對比越強）"
+                    },
+                    "tileGridSize": {
+                        "type": "tuple",
+                        "default": [8, 8],
+                        "description": "區域網格大小"
+                    },
+                    "iterations": {
+                        "type": "int",
+                        "default": 1,
+                        "range": [1, 3],
+                        "description": "迭代次數（多次迭代更穩定）"
+                    }
+                },
+                "fpga_constraints": {
+                    "estimated_clk": 680,
+                    "resource_usage": "Medium",
+                    "latency_type": "Pipeline",
+                    "dsp_count": 4,
+                    "lut_count": 5500,
+                    "bram_kb": 48,
+                    "notes": "針對硬幣反光優化的快速 CLAHE。比傳統 CLAHE 減少 40% 計算量。"
+                },
+                "author": "NKUST_Vision_Lab",
+                "date_added": "2026-01-31",
+                "name_zh": "快速CLAHE"
             }
         }
     },
     "_metadata": {
-        "total_algorithms": 31,
-        "official_count": 30,
+        "total_algorithms": 36,
+        "official_count": 35,
         "contributed_count": 1,
         "maintainers": [
             "NKUST_Vision_Lab"
         ],
         "license": "MIT",
-        "last_updated": "2026-01-20T17:01:40.311324"
+        "last_updated": "2026-01-31T10:53:00.000000"
     }
 }

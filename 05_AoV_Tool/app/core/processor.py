@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Callable, Optional
 import traceback
 
 # Import new Ops modules
-from app.vision.ops import basic, edge, morph, filter, transform, feature, detect, merge
+from app.vision.ops import basic, edge, morph, filter, transform, feature, detect, merge, segmentation
 
 class ImageProcessor:
     """
@@ -45,6 +45,7 @@ class ImageProcessor:
             "bitwise_not": filter.op_bitwise_not,
             "equalize_hist": filter.op_equalize_hist,
             "clahe_enhance": filter.op_clahe,
+            "fast_clahe": filter.op_fast_clahe,
             
             # --- Morphology ---
             "dilate": morph.op_dilate,
@@ -56,6 +57,7 @@ class ImageProcessor:
             # --- Feature ---
             "harris_corner": feature.op_harris_corner,
             "fast_detector": feature.op_fast_detector,
+            "hu_moments": feature.op_hu_moments,
             
             # --- Detection ---
             "advanced_coin_detection": detect.op_advanced_coin_logic,
@@ -67,6 +69,13 @@ class ImageProcessor:
             # --- Transform ---
             "flip": transform.op_flip,
             "rotate": transform.op_rotate,
+            "perspective_transform": transform.op_perspective_transform,
+            
+            # --- Segmentation ---
+            "watershed": segmentation.op_watershed,
+            
+            # --- Analysis ---
+            "distance_transform": detect.op_distance_transform,
             
             # --- Merge (Graph Ops) ---
             "add": merge.op_add,
@@ -143,6 +152,11 @@ class ImageProcessor:
             'bitwise_or': 'bitwise_or',
             'bitwise_xor': 'bitwise_xor',
             'absdiff': 'absdiff',
+            'warpperspective': 'perspective_transform',
+            'watershed': 'watershed',
+            'distancetransform': 'distance_transform',
+            'humoments': 'hu_moments',
+            'fastclahe': 'fast_clahe',
         }
         
         if func_lower in cv2_mappings:
