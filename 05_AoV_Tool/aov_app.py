@@ -330,18 +330,45 @@ with col_left:
         with col_gen1:
             if st.button("Generate Pipeline", type="primary", use_container_width=True):
                 if user_query:
-                    # Update API Key if provided
-                    if st.session_state.get('llm_api_key'):
-                        engine.prompt_master.api_key = st.session_state.llm_api_key
-                        engine.prompt_master.base_url = st.session_state.llm_base_url
-                        engine.prompt_master.model = st.session_state.get('llm_model_name', 'gpt-4o')
-                        engine.prompt_master.llm_available = True
+                    # [Fix] 先搜尋知識庫查看是否有類似案例
+                    with st.spinner("🔍 正在知識庫搜尋類似案例..."):
+                        kb_matches = kb.find_similar_cases_by_text(user_query, top_k=3)
                     
-                    with st.spinner("Processing..."):
-                        result = engine.process_user_query(
-                            user_query, 
-                            use_mock_llm=st.session_state.get('use_mock_llm', True)
-                        )
+                    if kb_matches and kb_matches[0][1] > 0.85:  # 相似度 > 0.85
+                        best_case, score = kb_matches[0]
+                        st.success(f"✅ 從知識庫找到高相似案例 (相似度: {score:.2f})")
+                        st.info(f"📚 案例描述: {best_case.get('description', '未命名')}")
+                        
+                        # 載入知識庫案例
+                        import copy
+                        st.session_state.pipeline = copy.deepcopy(best_case['pipeline'])
+                        st.session_state.processed_image = None
+                        st.session_state.last_reasoning = f"[知識庫推薦] 找到相似案例: {best_case.get('description', '')}"
+                        
+                        if st.session_state.uploaded_image is not None:
+                            h, w = st.session_state.uploaded_image.shape[:2]
+                            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                        
+                        st.rerun()
+                    else:
+                        # 知識庫沒有類似案例，使用 LLM 生成
+                        if kb_matches:
+                            st.info(f"💡 知識庫找到 {len(kb_matches)} 個案例，但相似度不足，改用 AI 生成...")
+                        else:
+                            st.info("💡 知識庫無類似案例，使用 AI 生成...")
+                        
+                        # Update API Key if provided
+                        if st.session_state.get('llm_api_key'):
+                            engine.prompt_master.api_key = st.session_state.llm_api_key
+                            engine.prompt_master.base_url = st.session_state.llm_base_url
+                            engine.prompt_master.model = st.session_state.get('llm_model_name', 'gpt-4o')
+                            engine.prompt_master.llm_available = True
+                        
+                        with st.spinner("🤖 AI 正在生成 Pipeline..."):
+                            result = engine.process_user_query(
+                                user_query, 
+                                use_mock_llm=st.session_state.get('use_mock_llm', True)
+                            )
                         
                         # Handle Error
                         if result.get("error"):
@@ -778,13 +805,18 @@ with col_left:
                                     st.code(" -> ".join([n['name'] for n in case['pipeline']]), language="text")
                                 with c2:
                                     if st.button("載入", key=f"load_text_{i}"):
-                                        st.session_state.pipeline = case['pipeline']
-                                        # Only recalc if image exists
-                                        if st.session_state.uploaded_image is not None:
+                                        # [Fix] 使用 deepcopy 確保完整複製 Pipeline 和參數
+                                        import copy
+                                        st.session_state.pipeline = copy.deepcopy(case['pipeline'])
+                                        st.session_state.processed_image = None  # 清除舊結果
+                                        
+                                        # 重新計算 FPGA 統計（無論是否有圖片）
+                                        if st.session_state.pipeline and st.session_state.uploaded_image is not None:
                                             h, w = st.session_state.uploaded_image.shape[:2]
                                             engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                                        st.success("已載入")
-                                        time.sleep(0.5)
+                                        
+                                        st.success(f"✅ 已載入方案: {case.get('description', '未命名')[:30]}...")
+                                        st.toast("Pipeline 已更新", icon="🔄")
                                         st.rerun()
                                 st.divider()
                     else:
@@ -805,10 +837,18 @@ with col_left:
                                     st.caption(case.get('description', ''))
                                     st.code(" -> ".join([n['name'] for n in case['pipeline']]), language="text")
                                     if st.button("套用此方案", key=f"apply_img_{i}"):
-                                        st.session_state.pipeline = case['pipeline']
-                                        h, w = st.session_state.uploaded_image.shape[:2]
-                                        engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
-                                        st.success("已套用")
+                                        # [Fix] 使用 deepcopy 確保完整複製 Pipeline 和參數
+                                        import copy
+                                        st.session_state.pipeline = copy.deepcopy(case['pipeline'])
+                                        st.session_state.processed_image = None  # 清除舊結果
+                                        
+                                        # 重新計算 FPGA 統計
+                                        if st.session_state.pipeline and st.session_state.uploaded_image is not None:
+                                            h, w = st.session_state.uploaded_image.shape[:2]
+                                            engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
+                                        
+                                        st.success(f"✅ 已套用方案: {case.get('description', '未命名')[:30]}...")
+                                        st.toast("Pipeline 已更新", icon="🔄")
                                         st.rerun()
                                     st.divider()
                     else:
