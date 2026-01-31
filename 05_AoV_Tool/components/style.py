@@ -533,7 +533,7 @@ def apply_custom_style():
 
         /* ================= Select Box & Dropdown ================= */
         .stSelectbox > div > div {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.9);
             border: 1px solid rgba(0, 255, 255, 0.3);
             border-radius: 8px;
             color: #ffffff !important;
@@ -543,6 +543,47 @@ def apply_custom_style():
         }
         .stSelectbox > div > div:hover {
             border-color: rgba(0, 255, 255, 0.5);
+        }
+
+        /* Dropdown menu options - prevent white background */
+        .stSelectbox [data-baseweb="menu"],
+        .stSelectbox [data-baseweb="select-menu"],
+        [data-baseweb="menu"],
+        [data-baseweb="popover"],
+        [data-baseweb="select"] [role="listbox"] {
+            background: rgba(10, 20, 35, 0.98) !important;
+            border: 2px solid rgba(0, 255, 255, 0.5) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 255, 255, 0.2) !important;
+        }
+
+        /* Dropdown options */
+        .stSelectbox [data-baseweb="menu"] li,
+        .stSelectbox [data-baseweb="select-menu"] li,
+        [data-baseweb="menu"] li,
+        [role="listbox"] [role="option"] {
+            background: transparent !important;
+            color: #00ffff !important;
+            font-weight: 500 !important;
+        }
+
+        /* Hover state for options */
+        .stSelectbox [data-baseweb="menu"] li:hover,
+        .stSelectbox [data-baseweb="select-menu"] li:hover,
+        [data-baseweb="menu"] li:hover,
+        [role="listbox"] [role="option"]:hover {
+            background: rgba(0, 200, 255, 0.2) !important;
+            color: #ffffff !important;
+        }
+
+        /* Selected option */
+        .stSelectbox [data-baseweb="menu"] li[aria-selected="true"],
+        .stSelectbox [data-baseweb="select-menu"] li[aria-selected="true"],
+        [data-baseweb="menu"] li[aria-selected="true"],
+        [role="listbox"] [role="option"][aria-selected="true"] {
+            background: rgba(0, 255, 255, 0.3) !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
         }
 
         /* ================= Checkbox & Radio ================= */
