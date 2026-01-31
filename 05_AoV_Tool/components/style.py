@@ -479,6 +479,15 @@ def apply_custom_style():
             max-width: 320px !important;
         }
         
+        /* Tooltip content - force dark background on ALL inner elements */
+        [data-testid="stHelpTooltip"] *,
+        .stTooltip *,
+        div[role="tooltip"] *,
+        [class*="tooltip"] *,
+        [data-baseweb="tooltip"] * {
+            background: transparent !important;
+        }
+        
         /* Tooltip content text - force white with high contrast */
         [data-testid="stHelpTooltip"] *,
         .stTooltip *,
@@ -487,12 +496,13 @@ def apply_custom_style():
         [data-baseweb="tooltip"] *,
         [data-testid="stHelpTooltip"] > div,
         [data-testid="stHelpTooltip"] p,
-        [data-testid="stHelpTooltip"] span {
-            color: #ffffff !important;
+        [data-testid="stHelpTooltip"] span,
+        [data-testid="stHelpTooltip"] div {
+            color: #00ffff !important;
             font-size: 0.95rem !important;
             line-height: 1.6 !important;
-            font-weight: 500 !important;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+            font-weight: 600 !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 1.0), 0 0 20px rgba(0, 0, 0, 0.8) !important;
         }
         
         /* Help icon (?) styling - more visible */
