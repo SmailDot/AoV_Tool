@@ -263,7 +263,7 @@ class ImageProcessor:
                 results_cache[node_id] = results_cache["source"]
         
         print(f"\n{'=' * 60}\n")
-        return last_output_image
+        return last_valid_output
 
     # ==================== Stateful Ops (Keep Here) ====================
     
