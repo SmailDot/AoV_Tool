@@ -16,7 +16,95 @@ def apply_custom_style():
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #0a0a0f 0%, #12121a 50%, #0d0d12 100%);
-            color: #e2e8f0;
+            color: #ffffff !important;
+        }
+
+        /* Force all text to be white/highly visible */
+        p, span, div, label, h1, h2, h3, h4, h5, h6, li, a, button {
+            color: #ffffff !important;
+        }
+
+        /* Special styling for titles with neon glow */
+        h1, h2, h3 {
+            color: #00ffff !important;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(0, 200, 255, 0.3) !important;
+        }
+
+        /* Subtitles and descriptions */
+        .stMarkdown p, .stMarkdown span {
+            color: #ffffff !important;
+            line-height: 1.6;
+        }
+
+        /* Ensure all Streamlit text elements are visible */
+        [data-testid="stText"] {
+            color: #ffffff !important;
+        }
+
+        /* Sidebar text visibility */
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+            color: #ffffff !important;
+        }
+
+        /* All expander content */
+        .streamlit-expanderContent {
+            color: #ffffff !important;
+        }
+        .streamlit-expanderContent p, .streamlit-expanderContent span {
+            color: #ffffff !important;
+        }
+
+        /* Ensure ALL Streamlit text components are visible */
+        .element-container {
+            color: #ffffff !important;
+        }
+
+        /* Override all possible text containers */
+        .stMarkdown, .stText, .stCode, .stJson, .stDataFrame {
+            color: #ffffff !important;
+        }
+
+        /* Ensure widget labels are visible */
+        .stWidgetLabel {
+            color: #ffffff !important;
+            font-weight: 500 !important;
+        }
+
+        /* All paragraphs and text within widgets */
+        .stMarkdown p, .stMarkdown div {
+            color: #ffffff !important;
+        }
+
+        /* Sidebar specific - ensure all text is white */
+        [data-testid="stSidebar"] .element-container {
+            color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] p {
+            color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] .stMarkdown {
+            color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] .stCaption {
+            color: #b0c4de !important;
+        }
+
+        /* Specific fix for st.caption - make it more visible */
+        .stCaption {
+            color: #a0c4e8 !important;
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
+        }
+
+        /* Specific fix for st.header */
+        .stHeader, [data-testid="stHeader"] {
+            color: #00ffff !important;
+        }
+
+        /* Fix for all st.subheader */
+        [data-testid="stSubheader"] {
+            color: #00ccff !important;
+            font-weight: 600 !important;
         }
 
         /* Tech Grid Background Pattern */
@@ -247,7 +335,7 @@ def apply_custom_style():
             padding: 1.5rem;
         }
         [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-            color: #00ccff;
+            color: #00ccff !important;
             font-family: 'JetBrains Mono', monospace;
             border-bottom: 1px solid rgba(0, 255, 255, 0.2);
             padding-bottom: 0.5rem;
@@ -374,18 +462,24 @@ def apply_custom_style():
 
         /* ================= Select Box & Dropdown ================= */
         .stSelectbox > div > div {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.3);
             border-radius: 8px;
-            color: #e2e8f0;
+            color: #ffffff !important;
+        }
+        .stSelectbox > div > div > div {
+            color: #ffffff !important;
         }
         .stSelectbox > div > div:hover {
-            border-color: rgba(0, 255, 255, 0.4);
+            border-color: rgba(0, 255, 255, 0.5);
         }
 
         /* ================= Checkbox & Radio ================= */
         .stCheckbox > div, .stRadio > div {
-            color: #e2e8f0;
+            color: #ffffff !important;
+        }
+        .stCheckbox > div > div, .stRadio > div > div {
+            color: #ffffff !important;
         }
         .stCheckbox > div > div > div:first-child, .stRadio > div > div > div:first-child {
             background: rgba(0, 255, 255, 0.2);
@@ -393,10 +487,10 @@ def apply_custom_style():
         }
         
         /* ================= Section Headers ================= */
-        h1, h2, h3 {
-            color: #00ffff;
+        h1, h2, h3, h4, h5, h6 {
+            color: #00ffff !important;
             font-family: 'JetBrains Mono', monospace;
-            text-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
             letter-spacing: -0.02em;
         }
         h1 {
@@ -404,84 +498,24 @@ def apply_custom_style():
             border-image: linear-gradient(90deg, #00ffff, #0080ff) 1;
             padding-bottom: 0.5rem;
         }
-        
-        /* ================= Animated Loading ================= */
-        @keyframes techPulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 5px rgba(0, 255, 255, 0.5); }
-            50% { opacity: 0.7; box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
-        }
-        
-        .stSpinner > div {
-            border-color: #00ffff transparent transparent transparent !important;
-        }
 
-        /* ================= DataFrames ================= */
-        .stDataFrame {
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .stDataFrame th {
-            background: rgba(0, 200, 255, 0.2);
-            color: #00ffff;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .stDataFrame td {
-            background: rgba(15, 23, 42, 0.4);
-            color: #e2e8f0;
-        }
-
-        /* ================= Plotly Charts ================= */
-        .stPlotlyChart {
-            background: rgba(15, 23, 42, 0.4);
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 1rem;
-        }
-
-        /* ================= File Uploader ================= */
-        .stFileUploader > div > div {
-            background: rgba(15, 23, 42, 0.6);
-            border: 2px dashed rgba(0, 255, 255, 0.3);
-            border-radius: 12px;
-            color: #00ccff;
-            transition: all 0.3s ease;
-        }
-        .stFileUploader > div > div:hover {
-            border-color: rgba(0, 255, 255, 0.6);
-            background: rgba(0, 255, 255, 0.05);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
-        }
-
-        /* ================= Tooltip ================= */
-        .stTooltip {
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-radius: 8px;
-            color: #00ccff;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
+        /* ================= Subheaders and Labels ================= */
+        .stSubheader, [data-testid="stSubheader"] {
+            color: #00ccff !important;
+            font-weight: 600;
         }
 
         /* ================= Caption ================= */
         .stCaption {
-            color: #64748b;
-            font-size: 0.85rem;
-            font-style: italic;
+            color: #a0c4e8 !important;
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
         }
         
-        /* ================= Horizontal Rule ================= */
-        hr {
-            border: none;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.5), transparent);
-            margin: 2rem 0;
-        }
-
         /* ================= Divider ================= */
         .stDivider {
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent);
-            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.5), transparent);
+            height: 2px;
             border: none;
         }
 
