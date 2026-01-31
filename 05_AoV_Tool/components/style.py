@@ -6,6 +6,7 @@ def apply_custom_style():
     注入客製化 CSS 樣式 (Cyberpunk/Tech Theme)
     科技感主題：深色背景、霓虹光效、玻璃拟态
     """
+    # 注入 CSS
     st.markdown("""
         <style>
         /* Import Fonts: Inter & JetBrains Mono */
@@ -474,7 +475,111 @@ def apply_custom_style():
             height: 1px;
             border: none;
         }
+
+        /* ================= Tech Loading Animation ================= */
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        
+        .tech-scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.8), transparent);
+            animation: scanline 4s linear infinite;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ================= Status Indicators ================= */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: rgba(0, 255, 170, 0.15);
+            border: 1px solid rgba(0, 255, 170, 0.4);
+            color: #00ffaa;
+        }
+
+        .status-active::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #00ffaa;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ffaa;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* ================= Holographic Effect ================= */
+        .holographic {
+            background: linear-gradient(
+                135deg,
+                rgba(0, 255, 255, 0.1) 0%,
+                rgba(0, 200, 255, 0.05) 25%,
+                rgba(0, 150, 255, 0.1) 50%,
+                rgba(0, 200, 255, 0.05) 75%,
+                rgba(0, 255, 255, 0.1) 100%
+            );
+            background-size: 400% 400%;
+            animation: holographic-shift 8s ease infinite;
+        }
+
+        @keyframes holographic-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
         </style>
+    """, unsafe_allow_html=True)
+
+    # 注入 JavaScript 动画
+    st.markdown("""
+        <script>
+        // 添加扫描线效果
+        function addScanline() {
+            if (!document.getElementById('tech-scanline')) {
+                const scanline = document.createElement('div');
+                scanline.id = 'tech-scanline';
+                scanline.className = 'tech-scanline';
+                document.body.appendChild(scanline);
+            }
+        }
+        
+        // 页面加载完成后添加效果
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(addScanline, 1000);
+        });
+        
+        // 添加打字机效果到特定元素
+        function typeWriter(element, text, speed = 50) {
+            let i = 0;
+            element.textContent = '';
+            function type() {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+        </script>
     """, unsafe_allow_html=True)
 
 def render_hero_section():
@@ -562,4 +667,15 @@ def render_neon_text(text, color="#00ffff", size="1rem"):
         ">
             {text}
         </span>
+    """, unsafe_allow_html=True)
+
+def render_status_indicator(status="active", text="ONLINE"):
+    """
+    渲染狀態指示器
+    """
+    status_class = f"status-{status}"
+    st.markdown(f"""
+        <div class="status-indicator {status_class}">
+            {text}
+        </div>
     """, unsafe_allow_html=True)
