@@ -589,72 +589,87 @@ def apply_custom_style():
             50% { background-position: 100% 50%; }
         }
 
-        /* ================= File Uploader - Enhanced Visibility ================= */
+        /* ================= File Uploader - Dark Theme Fix ================= */
         [data-testid="stFileUploader"] {
-            background: rgba(25, 35, 55, 0.9) !important;
-            border: 3px dashed rgba(0, 200, 255, 0.6) !important;
+            background: rgba(10, 15, 25, 0.95) !important;
+            border: 3px dashed rgba(0, 255, 255, 0.5) !important;
             border-radius: 16px !important;
             padding: 1.5rem !important;
             box-shadow: 
-                0 4px 20px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+                0 0 30px rgba(0, 255, 255, 0.15),
+                inset 0 0 20px rgba(0, 0, 0, 0.5);
         }
         
         [data-testid="stFileUploader"] > div {
-            background: rgba(30, 45, 70, 0.8) !important;
-            border: 2px dashed rgba(0, 255, 255, 0.4) !important;
+            background: rgba(15, 25, 40, 0.9) !important;
+            border: 2px solid rgba(0, 200, 255, 0.3) !important;
             border-radius: 12px !important;
             padding: 2rem !important;
         }
         
-        /* File uploader text - make it white and bold */
+        /* File uploader text - bright cyan for visibility on dark bg */
         [data-testid="stFileUploader"] p,
         [data-testid="stFileUploader"] span,
         [data-testid="stFileUploader"] div,
         [data-testid="stFileUploader"] label {
-            color: #ffffff !important;
+            color: #00ffff !important;
             font-size: 1rem !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3) !important;
         }
         
-        /* Drag and drop text */
+        /* Drag and drop text - even brighter */
         [data-testid="stFileUploader"] [role="button"] {
-            color: #00ffff !important;
+            color: #ffffff !important;
             font-weight: 700 !important;
-            text-shadow: 0 0 15px rgba(0, 255, 255, 0.8) !important;
-            font-size: 1.1rem !important;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 1.0) !important;
+            font-size: 1.2rem !important;
+            letter-spacing: 0.05em;
         }
         
         /* Browse files button */
         [data-testid="stFileUploader"] button {
-            background: linear-gradient(135deg, #0066cc, #0099ff) !important;
+            background: linear-gradient(135deg, #0066cc, #00ccff) !important;
             color: #ffffff !important;
-            border: none !important;
+            border: 2px solid rgba(0, 255, 255, 0.5) !important;
             border-radius: 8px !important;
             padding: 0.75rem 2rem !important;
-            font-weight: 600 !important;
-            font-size: 0.95rem !important;
-            box-shadow: 0 4px 15px rgba(0, 150, 255, 0.5) !important;
+            font-weight: 700 !important;
+            font-size: 1rem !important;
+            box-shadow: 0 0 20px rgba(0, 200, 255, 0.4) !important;
             margin-top: 1rem !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
         /* Hover states */
         [data-testid="stFileUploader"]:hover {
-            border-color: rgba(0, 255, 255, 0.9) !important;
-            background: rgba(35, 50, 80, 0.95) !important;
+            border-color: rgba(0, 255, 255, 0.8) !important;
+            background: rgba(15, 25, 45, 0.98) !important;
             box-shadow: 
-                0 6px 30px rgba(0, 255, 255, 0.25),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                0 0 40px rgba(0, 255, 255, 0.3),
+                inset 0 0 30px rgba(0, 0, 0, 0.6);
         }
         
         [data-testid="stFileUploader"]:hover > div {
-            border-color: rgba(0, 255, 255, 0.7) !important;
+            border-color: rgba(0, 255, 255, 0.6) !important;
+            background: rgba(20, 35, 55, 0.95) !important;
         }
 
         /* Icon in file uploader */
-        [data-testid="stFileUploader"] svg {
+        [data-testid="stFileUploader"] svg,
+        [data-testid="stFileUploader"] [data-testid="stIcon"] {
             color: #00ffff !important;
-            filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6));
+            fill: #00ffff !important;
+            filter: drop-shadow(0 0 12px rgba(0, 255, 255, 0.8)) !important;
+            width: 48px !important;
+            height: 48px !important;
+        }
+        
+        /* Small text like file limits */
+        [data-testid="stFileUploader"] small {
+            color: #88ccff !important;
+            font-size: 0.85rem !important;
+            opacity: 0.9;
         }
         </style>
     """, unsafe_allow_html=True)
