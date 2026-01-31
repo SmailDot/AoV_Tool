@@ -613,8 +613,55 @@ with col_left:
                             with open(save_path, 'w', encoding='utf-8') as f:
                                 f.write(json_str)
                             st.success(f"✅ 已儲存: {save_path}")
+                            
+                            # [NEW] 詢問是否存入知識庫中心
+                            if st.session_state.uploaded_image is not None:
+                                st.session_state._show_kb_dialog = True
+                            else:
+                                st.info("💡 若要存入知識庫，請先上傳圖片")
+                            
                         except Exception as e:
                             st.error(f"儲存失敗: {e}")
+                
+                # [NEW] 知識庫存入確認對話框
+                if st.session_state.get('_show_kb_dialog'):
+                    st.divider()
+                    st.markdown("### 📚 存入知識庫中心？")
+                    st.caption("將此案例存入知識庫，讓後人也能學習您的成果")
+                    
+                    kb_description = st.text_input(
+                        "案例描述",
+                        placeholder="例如：針對強反光的硬幣偵測、低光源下的邊緣檢測...",
+                        key="kb_save_description"
+                    )
+                    
+                    col_kb_yes, col_kb_no = st.columns(2)
+                    
+                    with col_kb_yes:
+                        if st.button("✅ 存入知識庫", use_container_width=True, type="primary"):
+                            if kb_description:
+                                try:
+                                    # 保存圖片到 uploads 目錄
+                                    os.makedirs("uploads", exist_ok=True)
+                                    timestamp = int(time.time())
+                                    img_path = f"uploads/case_{timestamp}.jpg"
+                                    cv2.imwrite(img_path, st.session_state.uploaded_image)
+                                    
+                                    # 存入知識庫
+                                    kb.add_case(img_path, st.session_state.pipeline, kb_description)
+                                    
+                                    st.session_state._show_kb_dialog = False
+                                    st.success(f"✅ 已成功存入知識庫！描述：{kb_description}")
+                                    st.balloons()
+                                except Exception as e:
+                                    st.error(f"存入知識庫失敗: {e}")
+                            else:
+                                st.warning("請輸入案例描述，幫助他人理解此案例的用途")
+                    
+                    with col_kb_no:
+                        if st.button("❌ 僅儲存檔案", use_container_width=True):
+                            st.session_state._show_kb_dialog = False
+                            st.info("已儲存 JSON 檔案，但未存入知識庫")
                 
                 st.markdown("### Code Generation")
                 tab_py, tab_vhdl, tab_verilog = st.tabs(["Python", "VHDL", "Verilog"])
