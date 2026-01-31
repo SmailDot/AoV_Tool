@@ -519,6 +519,28 @@ with col_left:
                             st.session_state._auto_execute = True
                             st.rerun()
                     
+                    # [New] Reset node parameters to default
+                    if st.button("↺ 重置", key=f"reset_{idx}", help="將所有參數恢復為預設值"):
+                        # Get original parameters from library
+                        func_name = node.get('function', node.get('name', ''))
+                        algo_data = engine.lib_manager.get_algorithm(func_name, 'official')
+                        if not algo_data:
+                            algo_data = engine.lib_manager.get_algorithm(func_name, 'contributed')
+                        
+                        if algo_data and 'parameters' in algo_data:
+                            # Reset parameters to library defaults
+                            st.session_state.pipeline[idx]['parameters'] = algo_data['parameters'].copy()
+                            # Clear cached widget values to force update
+                            for param_name in algo_data['parameters'].keys():
+                                key = f"param_{node_id}_{param_name}"
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            st.session_state._auto_execute = True
+                            st.toast(f"✅ 節點 '{node_name}' 已重置為預設值", icon="🔄")
+                            st.rerun()
+                        else:
+                            st.warning("無法找到原始預設值")
+                    
                     st.divider()
                     
                     st.caption(f"類別: {node.get('category', 'N/A')}")
