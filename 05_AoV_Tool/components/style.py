@@ -545,45 +545,63 @@ def apply_custom_style():
             border-color: rgba(0, 255, 255, 0.5);
         }
 
-        /* Dropdown menu options - prevent white background */
-        .stSelectbox [data-baseweb="menu"],
-        .stSelectbox [data-baseweb="select-menu"],
+        /* Dropdown menu options - AGGRESSIVE FIX for white background */
         [data-baseweb="menu"],
+        [data-baseweb="select-menu"],
         [data-baseweb="popover"],
-        [data-baseweb="select"] [role="listbox"] {
-            background: rgba(10, 20, 35, 0.98) !important;
-            border: 2px solid rgba(0, 255, 255, 0.5) !important;
+        [data-baseweb="layer"],
+        [data-baseweb="select"] [role="listbox"],
+        div[role="listbox"],
+        ul[role="listbox"] {
+            background: rgba(5, 10, 20, 1.0) !important;
+            background-color: rgba(5, 10, 20, 1.0) !important;
+            border: 2px solid rgba(0, 255, 255, 0.6) !important;
             border-radius: 8px !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 255, 255, 0.2) !important;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), 0 4px 20px rgba(0, 0, 0, 0.8) !important;
         }
 
-        /* Dropdown options */
-        .stSelectbox [data-baseweb="menu"] li,
-        .stSelectbox [data-baseweb="select-menu"] li,
-        [data-baseweb="menu"] li,
-        [role="listbox"] [role="option"] {
+        /* ALL dropdown items - force dark background and visible text */
+        [data-baseweb="menu"] *,
+        [data-baseweb="select-menu"] *,
+        [data-baseweb="popover"] *,
+        div[role="listbox"] *,
+        ul[role="listbox"] *,
+        [role="option"] {
             background: transparent !important;
+            background-color: transparent !important;
+        }
+
+        /* Dropdown options text - bright cyan for visibility */
+        [data-baseweb="menu"] li,
+        [data-baseweb="select-menu"] li,
+        [data-baseweb="popover"] li,
+        [role="option"],
+        [data-baseweb="menu"] div,
+        [data-baseweb="select-menu"] div {
             color: #00ffff !important;
-            font-weight: 500 !important;
-        }
-
-        /* Hover state for options */
-        .stSelectbox [data-baseweb="menu"] li:hover,
-        .stSelectbox [data-baseweb="select-menu"] li:hover,
-        [data-baseweb="menu"] li:hover,
-        [role="listbox"] [role="option"]:hover {
-            background: rgba(0, 200, 255, 0.2) !important;
-            color: #ffffff !important;
-        }
-
-        /* Selected option */
-        .stSelectbox [data-baseweb="menu"] li[aria-selected="true"],
-        .stSelectbox [data-baseweb="select-menu"] li[aria-selected="true"],
-        [data-baseweb="menu"] li[aria-selected="true"],
-        [role="listbox"] [role="option"][aria-selected="true"] {
-            background: rgba(0, 255, 255, 0.3) !important;
-            color: #ffffff !important;
+            background: transparent !important;
             font-weight: 600 !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9) !important;
+        }
+
+        /* Hover state for options - bright background */
+        [data-baseweb="menu"] li:hover,
+        [data-baseweb="select-menu"] li:hover,
+        [data-baseweb="popover"] li:hover,
+        [role="option"]:hover {
+            background: rgba(0, 200, 255, 0.25) !important;
+            background-color: rgba(0, 200, 255, 0.25) !important;
+            color: #ffffff !important;
+        }
+
+        /* Selected option - highlight */
+        [data-baseweb="menu"] li[aria-selected="true"],
+        [data-baseweb="select-menu"] li[aria-selected="true"],
+        [role="option"][aria-selected="true"] {
+            background: rgba(0, 255, 255, 0.35) !important;
+            background-color: rgba(0, 255, 255, 0.35) !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
         }
 
         /* ================= Checkbox & Radio ================= */
