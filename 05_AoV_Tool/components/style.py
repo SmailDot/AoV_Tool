@@ -460,44 +460,65 @@ def apply_custom_style():
             padding: 0.5rem;
         }
 
-        /* ================= Help Tooltip & Info Icons ================= */
-        /* Fix for st.help tooltip popups */
-        [data-testid="stHelpTooltip"] {
-            background: rgba(10, 20, 35, 0.98) !important;
-            border: 2px solid rgba(0, 255, 255, 0.6) !important;
+        /* ================= Help Tooltip & Info Icons - EXTENSIVE FIX ================= */
+        /* Fix for ALL st.help tooltip popups - targeting multiple possible selectors */
+        
+        /* Main tooltip container - try multiple selectors */
+        [data-testid="stHelpTooltip"],
+        .stTooltip,
+        div[role="tooltip"],
+        [class*="tooltip"],
+        [data-baseweb="tooltip"] {
+            background: rgba(5, 10, 20, 0.98) !important;
+            border: 2px solid rgba(0, 255, 255, 0.8) !important;
             border-radius: 12px !important;
             box-shadow: 
-                0 0 30px rgba(0, 255, 255, 0.3),
-                0 4px 20px rgba(0, 0, 0, 0.5) !important;
-            padding: 1rem !important;
-            max-width: 300px !important;
+                0 0 40px rgba(0, 255, 255, 0.4),
+                0 8px 32px rgba(0, 0, 0, 0.6) !important;
+            padding: 1rem 1.2rem !important;
+            max-width: 320px !important;
         }
         
-        [data-testid="stHelpTooltip"] > div {
+        /* Tooltip content text - force white with high contrast */
+        [data-testid="stHelpTooltip"] *,
+        .stTooltip *,
+        div[role="tooltip"] *,
+        [class*="tooltip"] *,
+        [data-baseweb="tooltip"] *,
+        [data-testid="stHelpTooltip"] > div,
+        [data-testid="stHelpTooltip"] p,
+        [data-testid="stHelpTooltip"] span {
             color: #ffffff !important;
-            font-size: 0.9rem !important;
-            line-height: 1.5 !important;
+            font-size: 0.95rem !important;
+            line-height: 1.6 !important;
+            font-weight: 500 !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
         }
         
-        /* Help icon (?) styling */
-        [data-testid="stHelpIcon"] {
+        /* Help icon (?) styling - more visible */
+        [data-testid="stHelpIcon"],
+        svg[data-testid="stHelpIcon"],
+        [class*="HelpIcon"] {
             color: #00ffff !important;
-            background: rgba(0, 255, 255, 0.15) !important;
-            border: 1px solid rgba(0, 255, 255, 0.4) !important;
+            fill: #00ffff !important;
+            background: rgba(0, 255, 255, 0.2) !important;
+            border: 2px solid rgba(0, 255, 255, 0.5) !important;
             border-radius: 50% !important;
-            width: 20px !important;
-            height: 20px !important;
+            width: 22px !important;
+            height: 22px !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
             font-weight: 700 !important;
-            font-size: 0.85rem !important;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3) !important;
+            font-size: 0.9rem !important;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4) !important;
         }
         
-        [data-testid="stHelpIcon"]:hover {
-            background: rgba(0, 255, 255, 0.3) !important;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
+        [data-testid="stHelpIcon"]:hover,
+        svg[data-testid="stHelpIcon"]:hover {
+            background: rgba(0, 255, 255, 0.35) !important;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6) !important;
+            transform: scale(1.1);
         }
 
         /* ================= Select Box & Dropdown ================= */
