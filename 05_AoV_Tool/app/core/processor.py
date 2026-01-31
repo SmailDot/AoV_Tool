@@ -178,7 +178,8 @@ class ImageProcessor:
             context = {}
         
         results_cache = {"source": image_bgr.copy()}
-        last_output_image = image_bgr.copy()
+        last_valid_output = image_bgr.copy()  # Track last enabled node's output
+        last_valid_node_id = "source"  # Track last enabled node's id
         
         print(f"\n{'=' * 60}")
         print(f"Executing Graph Pipeline ({len(pipeline_json)} nodes)")
@@ -186,6 +187,15 @@ class ImageProcessor:
         
         for idx, node in enumerate(pipeline_json):
             node_id = node.get('id', f'node_{idx}')
+            is_enabled = node.get('_enabled', True)
+            
+            # [Fix] Handle disabled/skipped nodes - pass through last valid output
+            if not is_enabled:
+                print(f"\n[{node_id}] SKIPPED (disabled)")
+                # Disabled node passes through the last valid output
+                results_cache[node_id] = last_valid_output
+                continue
+            
             try:
                 raw_func_name = node.get('function', node.get('name', 'Unknown'))
                 func_name = self._normalize_func_name(raw_func_name)
@@ -194,23 +204,21 @@ class ImageProcessor:
                 
                 print(f"\n[{node_id}] {raw_func_name} -> {func_name} (Inputs: {input_ids})")
                 
-                print(f"\n[{node_id}] {func_name} (Inputs: {input_ids})")
-                
-                # Resolve Inputs
+                # Resolve Inputs - use last valid output if no explicit inputs
                 input_images = []
                 if not input_ids:
                     if idx == 0:
                         input_images = [results_cache["source"]]
                     else:
-                        prev_id = pipeline_json[idx-1].get('id', f'node_{idx-1}')
-                        input_images = [results_cache.get(prev_id, results_cache["source"])]
+                        # Use last valid node's output instead of just previous node
+                        input_images = [last_valid_output]
                 else:
                     for inp_id in input_ids:
                         if inp_id in results_cache:
                             input_images.append(results_cache[inp_id])
                         else:
-                            print(f"  [WARN] Input '{inp_id}' not found. Using source.")
-                            input_images.append(results_cache["source"])
+                            print(f"  [WARN] Input '{inp_id}' not found. Using last valid output.")
+                            input_images.append(last_valid_output)
                 
                 # Dispatch
                 if func_name in self.operation_map:
@@ -237,7 +245,8 @@ class ImageProcessor:
                         output_image = np.zeros_like(results_cache["source"])
                     
                     results_cache[node_id] = output_image
-                    last_output_image = output_image
+                    last_valid_output = output_image  # Update last valid output
+                    last_valid_node_id = node_id
                     print(f"  [OK] Output shape: {output_image.shape}")
                     
                 else:
@@ -248,6 +257,8 @@ class ImageProcessor:
                 
             except Exception as e:
                 print(f"  [ERROR] Node {node_id} failed: {e}")
+                # On error, pass through last valid output so pipeline can continue
+                results_cache[node_id] = last_valid_output
                 if debug_mode: traceback.print_exc()
                 results_cache[node_id] = results_cache["source"]
         

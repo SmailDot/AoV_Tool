@@ -79,6 +79,37 @@ render_hero_section()
 col_left, col_right = st.columns([1, 1.5], gap="large") # Added gap
 
 with col_left:
+    # [Auto-execution] Function to execute pipeline automatically on changes
+    def execute_pipeline_auto():
+        """Auto-execute pipeline when changes are made"""
+        if st.session_state.pipeline and (st.session_state.uploaded_image is not None or st.session_state.get('is_video')):
+            try:
+                active_pipeline = [n for n in st.session_state.pipeline if n.get('_enabled', True)]
+                
+                if st.session_state.get('is_video'):
+                    # Video Execution
+                    output_path = "temp_output.mp4"
+                    stats = processor.process_video(
+                        st.session_state.video_path,
+                        output_path,
+                        active_pipeline
+                    )
+                    st.session_state.processed_video_path = output_path
+                else:
+                    # Image Execution
+                    if st.session_state.uploaded_image is not None:
+                        result = processor.execute_pipeline(
+                            st.session_state.uploaded_image,
+                            active_pipeline
+                        )
+                        st.session_state.processed_image = result
+                
+                # Show update toast
+                st.toast("✅ Pipeline Updated", icon="🔄")
+                
+            except Exception as e:
+                st.toast(f"❌ Pipeline Error: {str(e)[:50]}", icon="⚠️")
+    
     # ================= 1. Global Input (Uploader) =================
     st.subheader("1. 影像輸入")
     
@@ -431,6 +462,7 @@ with col_left:
                     engine.verilog_guru.recalculate_pipeline_stats(st.session_state.pipeline, w, h)
                     
                 st.success(f"已新增 {algo_data['name']}")
+                st.session_state._auto_execute = True
                 st.rerun()
         
         # Only show node list if there are nodes
@@ -450,6 +482,7 @@ with col_left:
                                 st.session_state.pipeline[idx-1], st.session_state.pipeline[idx]
                             for i, n in enumerate(st.session_state.pipeline):
                                 n['id'] = f"node_{i}"
+                            st.session_state._auto_execute = True
                             st.rerun()
                     
                     with col_btn2:
@@ -458,6 +491,7 @@ with col_left:
                                 st.session_state.pipeline[idx+1], st.session_state.pipeline[idx]
                             for i, n in enumerate(st.session_state.pipeline):
                                 n['id'] = f"node_{i}"
+                            st.session_state._auto_execute = True
                             st.rerun()
                     
                     with col_btn3:
@@ -467,12 +501,14 @@ with col_left:
                             st.session_state.pipeline.insert(move_to, node_to_move)
                             for i, n in enumerate(st.session_state.pipeline):
                                 n['id'] = f"node_{i}"
+                            st.session_state._auto_execute = True
                             st.rerun()
                     
                     with col_btn4:
                         skip_label = "Enable" if not is_enabled else "Skip"
                         if st.button(skip_label, key=f"skip_{idx}"):
                             st.session_state.pipeline[idx]['_enabled'] = not is_enabled
+                            st.session_state._auto_execute = True
                             st.rerun()
                     
                     with col_btn5:
@@ -480,6 +516,7 @@ with col_left:
                             st.session_state.pipeline.pop(idx)
                             for i, n in enumerate(st.session_state.pipeline):
                                 n['id'] = f"node_{i}"
+                            st.session_state._auto_execute = True
                             st.rerun()
                     
                     st.divider()
@@ -636,6 +673,11 @@ with col_left:
                             
                     except Exception as e:
                         st.error(f"Failed: {e}")
+        
+        # [Auto-execution] Check if auto-execution is triggered
+        if st.session_state.get('_auto_execute'):
+            st.session_state._auto_execute = False  # Reset flag
+            execute_pipeline_auto()
 
     # ----------------- Tab 2: Knowledge Base -----------------
     with tab_kb:

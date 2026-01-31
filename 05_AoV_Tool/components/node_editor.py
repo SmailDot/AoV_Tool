@@ -65,3 +65,5 @@ def render_parameter_editor(node: dict, idx: int, node_id: str):
             # Update State
             if new_value != param_default:
                 st.session_state.pipeline[idx]['parameters'][param_name]['default'] = new_value
+                # [Auto-execution] Mark for auto-execution on parameter change
+                st.session_state._auto_execute = True
