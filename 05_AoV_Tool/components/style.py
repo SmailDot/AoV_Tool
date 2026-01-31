@@ -460,6 +460,46 @@ def apply_custom_style():
             padding: 0.5rem;
         }
 
+        /* ================= Help Tooltip & Info Icons ================= */
+        /* Fix for st.help tooltip popups */
+        [data-testid="stHelpTooltip"] {
+            background: rgba(10, 20, 35, 0.98) !important;
+            border: 2px solid rgba(0, 255, 255, 0.6) !important;
+            border-radius: 12px !important;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                0 4px 20px rgba(0, 0, 0, 0.5) !important;
+            padding: 1rem !important;
+            max-width: 300px !important;
+        }
+        
+        [data-testid="stHelpTooltip"] > div {
+            color: #ffffff !important;
+            font-size: 0.9rem !important;
+            line-height: 1.5 !important;
+        }
+        
+        /* Help icon (?) styling */
+        [data-testid="stHelpIcon"] {
+            color: #00ffff !important;
+            background: rgba(0, 255, 255, 0.15) !important;
+            border: 1px solid rgba(0, 255, 255, 0.4) !important;
+            border-radius: 50% !important;
+            width: 20px !important;
+            height: 20px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3) !important;
+        }
+        
+        [data-testid="stHelpIcon"]:hover {
+            background: rgba(0, 255, 255, 0.3) !important;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
+        }
+
         /* ================= Select Box & Dropdown ================= */
         .stSelectbox > div > div {
             background: rgba(15, 23, 42, 0.8);
