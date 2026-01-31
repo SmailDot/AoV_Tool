@@ -3,119 +3,563 @@ import streamlit as st
 
 def apply_custom_style():
     """
-    注入客製化 CSS 樣式 (Modern Lab Theme)
+    注入客製化 CSS 樣式 (Cyberpunk/Tech Theme)
+    科技感主題：深色背景、霓虹光效、玻璃拟态
     """
     st.markdown("""
         <style>
-        /* Import Font: Inter */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        /* Import Fonts: Inter & JetBrains Mono */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+        /* Global Reset & Tech Theme */
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #12121a 50%, #0d0d12 100%);
+            color: #e2e8f0;
         }
 
-        /* 1. Main Container Padding Clean up */
+        /* Tech Grid Background Pattern */
+        .stApp {
+            background: 
+                linear-gradient(135deg, rgba(10, 10, 15, 0.97) 0%, rgba(18, 18, 26, 0.95) 50%, rgba(13, 13, 18, 0.97) 100%),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 50px,
+                    rgba(0, 255, 255, 0.03) 50px,
+                    rgba(0, 255, 255, 0.03) 51px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 50px,
+                    rgba(0, 255, 255, 0.03) 50px,
+                    rgba(0, 255, 255, 0.03) 51px
+                );
+            background-attachment: fixed;
+        }
+
+        /* Main Container */
         .block-container {
-            padding-top: 2rem;
+            padding-top: 1.5rem;
             padding-bottom: 2rem;
+            max-width: 95%;
         }
 
-        /* 2. Custom Hero Header */
+        /* ================= Hero Header - Tech Style ================= */
         .hero-header {
-            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-            padding: 2rem;
-            border-radius: 12px;
+            background: 
+                linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.85) 100%),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.1) 0%, transparent 50%, rgba(0, 200, 255, 0.1) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 16px;
+            padding: 2rem 2.5rem;
             color: white;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            box-shadow: 
+                0 0 40px rgba(0, 255, 255, 0.15),
+                0 0 80px rgba(0, 200, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
         }
+        
+        /* Animated Glow Border */
+        .hero-header::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #00ffff, #0080ff, #00ffff, #0080ff);
+            border-radius: 18px;
+            z-index: -1;
+            opacity: 0.5;
+            animation: borderGlow 3s linear infinite;
+        }
+        
+        @keyframes borderGlow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+        
         .hero-title {
-            font-size: 1.8rem;
+            font-size: 2.2rem;
             font-weight: 700;
             margin: 0;
-            background: linear-gradient(90deg, #60A5FA, #E879F9);
+            background: linear-gradient(90deg, #00ffff 0%, #00ccff 50%, #0080ff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            letter-spacing: -0.02em;
         }
         .hero-subtitle {
-            font-size: 0.9rem;
-            color: #94A3B8;
-            margin-top: 0.5rem;
+            font-size: 1rem;
+            color: #94a3b8;
+            margin-top: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
         }
 
-        /* 3. Card-like Containers */
-        .stExpander {
-            background-color: #FFFFFF;
-            border-radius: 8px;
-            border: 1px solid #E2E8F0;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        /* ================= Glassmorphism Cards ================= */
+        .stExpander, div[data-testid="stExpander"] {
+            background: rgba(30, 41, 59, 0.4) !important;
+            backdrop-filter: blur(12px);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 255, 255, 0.15);
+            box-shadow: 
+                0 4px 24px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
             margin-bottom: 1rem;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
         }
         .stExpander:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-color: #CBD5E1;
+            border-color: rgba(0, 255, 255, 0.3);
+            box-shadow: 
+                0 8px 32px rgba(0, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
         }
         
-        /* Remove default expander border to cleaner look */
         .streamlit-expanderHeader {
             font-weight: 600;
-            color: #334155;
-            background-color: transparent;
+            color: #00ccff !important;
+            background: transparent !important;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 1rem 1.25rem;
         }
 
-        /* 4. Buttons */
+        /* ================= Tech Buttons ================= */
         div.stButton > button {
-            border-radius: 6px;
-            font-weight: 500;
-            transition: transform 0.1s;
-        }
-        div.stButton > button:active {
-            transform: scale(0.98);
-        }
-        /* Primary Button Style */
-        div.stButton > button[kind="primary"] {
-            background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%);
+            border-radius: 8px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.85rem;
             border: none;
-            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        div.stButton > button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        div.stButton > button:hover::before {
+            left: 100%;
+        }
+        
+        div.stButton > button:active {
+            transform: scale(0.96);
+        }
+        
+        /* Primary Button - Cyberpunk Blue */
+        div.stButton > button[kind="primary"] {
+            background: linear-gradient(135deg, #0066cc 0%, #0099ff 50%, #00ccff 100%);
+            box-shadow: 
+                0 4px 15px rgba(0, 153, 255, 0.4),
+                0 0 30px rgba(0, 200, 255, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            box-shadow: 
+                0 6px 20px rgba(0, 153, 255, 0.6),
+                0 0 40px rgba(0, 200, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        /* Secondary Button - Dark Tech */
+        div.stButton > button:not([kind="primary"]) {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            color: #00ccff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        div.stButton > button:not([kind="primary"]):hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: rgba(0, 255, 255, 0.5);
+            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.2);
         }
 
-        /* 5. Metrics & Toasts */
-        [data-testid="stMetricValue"] {
-            font-family: 'Inter', monospace;
-            color: #2563EB;
+        /* ================= Input Fields - Tech Style ================= */
+        .stTextInput input, .stNumberInput input, .stTextArea textarea {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.3s ease;
+        }
+        .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+            border-color: rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            outline: none;
         }
         
-        /* 6. Sidebar Polish */
+        /* Labels */
+        label, .stTextInput label, .stNumberInput label {
+            color: #00ccff !important;
+            font-weight: 500;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* ================= Slider - Tech Blue ================= */
+        div[data-testid="stSlider"] div[role="slider"] {
+            background: linear-gradient(90deg, #00ffff, #0080ff);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        div[data-testid="stSlider"] > div > div {
+            background: rgba(0, 255, 255, 0.2);
+        }
+
+        /* ================= Sidebar - Dark Tech ================= */
         [data-testid="stSidebar"] {
-            background-color: #F8FAFC;
-            border-right: 1px solid #E2E8F0;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 10, 15, 0.98) 100%);
+            border-right: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+        }
+        [data-testid="stSidebar"] > div {
+            padding: 1.5rem;
+        }
+        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+            color: #00ccff;
+            font-family: 'JetBrains Mono', monospace;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+            padding-bottom: 0.5rem;
+        }
+
+        /* ================= Tabs - Neon Style ================= */
+        .stTabs [data-baseweb="tab-list"] {
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 12px;
+            padding: 0.5rem;
+            border: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        .stTabs [data-baseweb="tab"] {
+            color: #94a3b8;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            background: rgba(0, 200, 255, 0.2);
+            color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        /* ================= Code & Metrics ================= */
+        code, pre {
+            font-family: 'JetBrains Mono', monospace !important;
+            background: rgba(0, 0, 0, 0.3) !important;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #00ffaa !important;
         }
         
-        /* 7. Image Captions */
+        [data-testid="stMetricValue"] {
+            font-family: 'JetBrains Mono', monospace;
+            color: #00ffff !important;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        [data-testid="stMetricLabel"] {
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.75rem;
+        }
+
+        /* ================= Toast Notifications ================= */
+        .stToast {
+            background: rgba(15, 23, 42, 0.95) !important;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+        }
+
+        /* ================= Success/Info/Error Messages ================= */
+        .stSuccess, .stInfo, .stWarning, .stError {
+            border-radius: 12px;
+            border: 1px solid;
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.8) !important;
+        }
+        .stSuccess {
+            border-color: rgba(0, 255, 170, 0.4);
+            box-shadow: 0 0 20px rgba(0, 255, 170, 0.1);
+        }
+        .stSuccess > div:first-child {
+            color: #00ffaa !important;
+        }
+        .stInfo {
+            border-color: rgba(0, 200, 255, 0.4);
+            box-shadow: 0 0 20px rgba(0, 200, 255, 0.1);
+        }
+        .stInfo > div:first-child {
+            color: #00ccff !important;
+        }
+        .stWarning {
+            border-color: rgba(255, 200, 0, 0.4);
+            box-shadow: 0 0 20px rgba(255, 200, 0, 0.1);
+        }
+        .stWarning > div:first-child {
+            color: #ffcc00 !important;
+        }
+        .stError {
+            border-color: rgba(255, 80, 80, 0.4);
+            box-shadow: 0 0 20px rgba(255, 80, 80, 0.1);
+        }
+        .stError > div:first-child {
+            color: #ff5555 !important;
+        }
+
+        /* ================= Scrollbar - Tech Style ================= */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #00ffff, #0080ff);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #00ccff, #0099ff);
+        }
+
+        /* ================= Image Display ================= */
+        .stImage {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
         .stImage > div > div > div {
             font-size: 0.8rem;
-            color: #64748B;
+            color: #00ccff;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 0.5rem;
         }
 
+        /* ================= Select Box & Dropdown ================= */
+        .stSelectbox > div > div {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+        }
+        .stSelectbox > div > div:hover {
+            border-color: rgba(0, 255, 255, 0.4);
+        }
+
+        /* ================= Checkbox & Radio ================= */
+        .stCheckbox > div, .stRadio > div {
+            color: #e2e8f0;
+        }
+        .stCheckbox > div > div > div:first-child, .stRadio > div > div > div:first-child {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: rgba(0, 255, 255, 0.4);
+        }
+        
+        /* ================= Section Headers ================= */
+        h1, h2, h3 {
+            color: #00ffff;
+            font-family: 'JetBrains Mono', monospace;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            letter-spacing: -0.02em;
+        }
+        h1 {
+            border-bottom: 2px solid;
+            border-image: linear-gradient(90deg, #00ffff, #0080ff) 1;
+            padding-bottom: 0.5rem;
+        }
+        
+        /* ================= Animated Loading ================= */
+        @keyframes techPulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 5px rgba(0, 255, 255, 0.5); }
+            50% { opacity: 0.7; box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+        }
+        
+        .stSpinner > div {
+            border-color: #00ffff transparent transparent transparent !important;
+        }
+
+        /* ================= DataFrames ================= */
+        .stDataFrame {
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .stDataFrame th {
+            background: rgba(0, 200, 255, 0.2);
+            color: #00ffff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .stDataFrame td {
+            background: rgba(15, 23, 42, 0.4);
+            color: #e2e8f0;
+        }
+
+        /* ================= Plotly Charts ================= */
+        .stPlotlyChart {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        /* ================= File Uploader ================= */
+        .stFileUploader > div > div {
+            background: rgba(15, 23, 42, 0.6);
+            border: 2px dashed rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            color: #00ccff;
+            transition: all 0.3s ease;
+        }
+        .stFileUploader > div > div:hover {
+            border-color: rgba(0, 255, 255, 0.6);
+            background: rgba(0, 255, 255, 0.05);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        /* ================= Tooltip ================= */
+        .stTooltip {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            color: #00ccff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        /* ================= Caption ================= */
+        .stCaption {
+            color: #64748b;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        
+        /* ================= Horizontal Rule ================= */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.5), transparent);
+            margin: 2rem 0;
+        }
+
+        /* ================= Divider ================= */
+        .stDivider {
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent);
+            height: 1px;
+            border: none;
+        }
         </style>
     """, unsafe_allow_html=True)
 
 def render_hero_section():
     """
-    渲染頂部 Hero 區塊
+    渲染頂部 Hero 區塊 - 科技風格
     """
     st.markdown("""
         <div class="hero-header">
             <div>
-                <div class="hero-title">NKUST AoV Tool</div>
-                <div class="hero-subtitle">FPGA-aware Computer Vision Pipeline Generator</div>
+                <div class="hero-title">◈ NKUST AoV Tool</div>
+                <div class="hero-subtitle">FPGA-AWARE COMPUTER VISION PIPELINE GENERATOR</div>
             </div>
-            <div style="text-align: right; color: #94A3B8; font-size: 0.8rem;">
-                v1.0.1<br>Visual Lab
+            <div style="text-align: right;">
+                <div style="font-family: 'JetBrains Mono', monospace; color: #00ffff; font-size: 0.75rem;">
+                    ◉ SYSTEM STATUS: <span style="color: #00ffaa;">ONLINE</span>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; color: #64748b; font-size: 0.7rem; margin-top: 0.5rem;">
+                    v2.0.0 | NKUST Visual Lab
+                </div>
             </div>
         </div>
+    """, unsafe_allow_html=True)
+
+def render_tech_card(title, content, icon="◈"):
+    """
+    渲染科技感卡片
+    """
+    st.markdown(f"""
+        <div style="
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="
+                font-family: 'JetBrains Mono', monospace;
+                color: #00ffff;
+                font-size: 1.1rem;
+                font-weight: 600;
+                margin-bottom: 0.75rem;
+                border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+                padding-bottom: 0.5rem;
+            ">
+                {icon} {title}
+            </div>
+            <div style="color: #e2e8f0; line-height: 1.6;">
+                {content}
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+def render_tech_badge(text, color="#00ffff"):
+    """
+    渲染科技徽章
+    """
+    st.markdown(f"""
+        <span style="
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid {color};
+            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: {color};
+            margin: 0.25rem;
+        ">
+            {text}
+        </span>
+    """, unsafe_allow_html=True)
+
+def render_neon_text(text, color="#00ffff", size="1rem"):
+    """
+    渲染霓虹文字
+    """
+    st.markdown(f"""
+        <span style="
+            font-family: 'JetBrains Mono', monospace;
+            color: {color};
+            font-size: {size};
+            text-shadow: 0 0 10px {color}80;
+        ">
+            {text}
+        </span>
     """, unsafe_allow_html=True)
