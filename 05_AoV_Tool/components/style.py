@@ -671,6 +671,44 @@ def apply_custom_style():
             font-size: 0.85rem !important;
             opacity: 0.9;
         }
+
+        /* ================= Cursor Effects ================= */
+        /* Custom Tech Cursor */
+        * {
+            cursor: crosshair !important;
+        }
+        
+        a, button, [role="button"], input, select, textarea, .stButton button {
+            cursor: pointer !important;
+        }
+
+        /* ================= Hover Glow Effects ================= */
+        /* Interactive elements glow on hover */
+        .stButton button:hover,
+        [data-testid="stFileUploader"]:hover,
+        .stExpander:hover,
+        .stTextInput input:hover,
+        .stNumberInput input:hover,
+        .stSelectbox > div > div:hover {
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.4),
+                0 0 60px rgba(0, 200, 255, 0.2) !important;
+            transition: all 0.3s ease;
+        }
+
+        /* Card hover lift effect */
+        .stExpander:hover {
+            transform: translateY(-3px);
+        }
+
+        /* Image hover glow */
+        .stImage:hover {
+            box-shadow: 
+                0 0 40px rgba(0, 255, 255, 0.3),
+                0 0 80px rgba(0, 200, 255, 0.2) !important;
+            transform: scale(1.02);
+            transition: all 0.4s ease;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -686,6 +724,112 @@ def apply_custom_style():
                 document.body.appendChild(scanline);
             }
         }
+        
+        // ================= Mouse Ripple Effect =================
+        function createRipple(event) {
+            const ripple = document.createElement('div');
+            ripple.style.position = 'fixed';
+            ripple.style.left = event.clientX + 'px';
+            ripple.style.top = event.clientY + 'px';
+            ripple.style.width = '0px';
+            ripple.style.height = '0px';
+            ripple.style.borderRadius = '50%';
+            ripple.style.background = 'radial-gradient(circle, rgba(0,255,255,0.6) 0%, rgba(0,200,255,0.3) 40%, transparent 70%)';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.zIndex = '99999';
+            ripple.style.transform = 'translate(-50%, -50%)';
+            ripple.style.animation = 'ripple-expand 0.6s ease-out forwards';
+            
+            document.body.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        }
+        
+        // Add ripple animation style
+        const rippleStyle = document.createElement('style');
+        rippleStyle.textContent = `
+            @keyframes ripple-expand {
+                0% {
+                    width: 0px;
+                    height: 0px;
+                    opacity: 1;
+                }
+                100% {
+                    width: 100px;
+                    height: 100px;
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(rippleStyle);
+        
+        // ================= Mouse Trail Effect =================
+        const trailDots = [];
+        const maxTrailDots = 20;
+        
+        function createTrailDot(x, y) {
+            const dot = document.createElement('div');
+            dot.style.position = 'fixed';
+            dot.style.left = x + 'px';
+            dot.style.top = y + 'px';
+            dot.style.width = '4px';
+            dot.style.height = '4px';
+            dot.style.backgroundColor = 'rgba(0, 255, 255, 0.8)';
+            dot.style.borderRadius = '50%';
+            dot.style.pointerEvents = 'none';
+            dot.style.zIndex = '99998';
+            dot.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 200, 255, 0.5)';
+            dot.style.transform = 'translate(-50%, -50%)';
+            
+            document.body.appendChild(dot);
+            trailDots.push(dot);
+            
+            // Fade out animation
+            dot.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+            setTimeout(() => {
+                dot.style.opacity = '0';
+                dot.style.transform = 'translate(-50%, -50%) scale(0)';
+            }, 10);
+            
+            // Remove after animation
+            setTimeout(() => {
+                dot.remove();
+                const index = trailDots.indexOf(dot);
+                if (index > -1) {
+                    trailDots.splice(index, 1);
+                }
+            }, 510);
+        }
+        
+        let lastTrailTime = 0;
+        const trailInterval = 30; // ms
+        
+        document.addEventListener('mousemove', function(e) {
+            const now = Date.now();
+            if (now - lastTrailTime > trailInterval) {
+                createTrailDot(e.clientX, e.clientY);
+                lastTrailTime = now;
+            }
+        });
+        
+        // ================= Click Effects =================
+        document.addEventListener('click', function(e) {
+            createRipple(e);
+            
+            // Create burst effect
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const distance = 30;
+                const x = e.clientX + Math.cos(angle) * distance;
+                const y = e.clientY + Math.sin(angle) * distance;
+                
+                setTimeout(() => {
+                    createTrailDot(x, y);
+                }, i * 30);
+            }
+        });
         
         // 页面加载完成后添加效果
         document.addEventListener('DOMContentLoaded', function() {
