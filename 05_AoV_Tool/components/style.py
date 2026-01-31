@@ -197,26 +197,35 @@ def apply_custom_style():
 
         /* ================= Input Fields - Tech Style ================= */
         .stTextInput input, .stNumberInput input, .stTextArea textarea {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.3);
             border-radius: 8px;
-            color: #e2e8f0;
+            color: #ffffff !important;
             font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 500;
             transition: all 0.3s ease;
+            text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
         }
         .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
-            border-color: rgba(0, 255, 255, 0.6);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            border-color: rgba(0, 255, 255, 0.8);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            background: rgba(15, 23, 42, 0.95);
             outline: none;
+        }
+        .stTextInput input::placeholder, .stTextArea textarea::placeholder {
+            color: #94a3b8 !important;
+            opacity: 1;
         }
         
         /* Labels */
         label, .stTextInput label, .stNumberInput label {
-            color: #00ccff !important;
-            font-weight: 500;
+            color: #ffffff !important;
+            font-weight: 600;
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
         }
 
         /* ================= Slider - Tech Blue ================= */
